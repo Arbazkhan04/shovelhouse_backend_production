@@ -55,7 +55,7 @@ const register = async (req, res) => {
       // Generate a JWT token
       const token = user.createJWT();
 
-      res.status(StatusCodes.CREATED).json({ user: { name: user.userName }, token });
+      res.status(StatusCodes.CREATED).json({ user: { role: user.userName }, token });
     } catch (err) {
       console.log('Error during user registration:', err);
       res.status(400).json({ error: 'Invalid User Data', message: err.message });
@@ -79,7 +79,7 @@ const login = async (req, res) => {
     }
     // compare password
     const token = user.createJWT()
-    res.status(StatusCodes.OK).json({ user: { name: user.name }, token })
+    res.status(StatusCodes.OK).json({ user: { role: user.userRole }, token })
   }
 
 
