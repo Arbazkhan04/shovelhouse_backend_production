@@ -10,8 +10,8 @@ const cors = require('cors')
 const bodyParser = require('body-parser')
 const http = require('http'); // Import the HTTP library
 const configureSocket = require('./socket/index.js'); // Import the Socket.IO configuration
-const Job = require('./models/Job.js')
-const User = require('./models/User.js')
+const Job = require('./models/Job')
+const User = require('./models/User')
 require('./utlis/Scheduler.js')
 
 const app = express();
@@ -20,6 +20,7 @@ const server = http.createServer(app);
 
 //webhoool for stripe
 app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
+    console.log('Received Stripe event:', req.body);
     const sig = req.headers['stripe-signature'];
     const endpointSecret = 'whsec_34WmFnqyyJgpCmcP2WYMErkplbWCJ3v6';
 
@@ -70,6 +71,7 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
 
 
     if (event.type === 'account.updated') {
+        console.log('Account updated event received:', event.data.object);
         const account = event.data.object;
         const stripeAccountId = account.id; // Get the Stripe account ID
         const chargesEnabled = account.charges_enabled;
