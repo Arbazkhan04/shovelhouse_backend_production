@@ -12,6 +12,8 @@ const Connect = (req, res) => {
     res.redirect(stripeOAuthUrl);
 }
 
+
+
 const StripeCallback = async (req, res) => {
     console.log("Stripe Callback Endpoint Hit");
     const code = req.query.code; // The authorization code from Stripe
@@ -37,14 +39,44 @@ const StripeCallback = async (req, res) => {
 
         console.log('Stripe Account Details:', account);
 
-        // Save the stripeAccountId in your database, linked to the user
-        await User.updateOne({ _id: userId }, { stripeAccountId });
+        // Extract relevant account details
+        const chargesEnabled = account.charges_enabled;
+        const stripeAccountStatus = chargesEnabled ? 'enabled' : 'restricted';
+        const reason = chargesEnabled ? null : getReasonFromRequirements(account.requirements);
+
+        // Save the stripeAccountId and details in your database, linked to the user
+        await User.updateOne(
+            { _id: userId },
+            {
+                stripeAccountId,
+                stripeAccountStatus,
+                chargesEnabled,
+                reason
+            }
+        );
 
         res.send(`Account connected! Stripe Account ID: ${stripeAccountId}. Account details: ${JSON.stringify(account)}`);
     } catch (error) {
         console.error('Error connecting to Stripe:', error); // Log error for debugging
         res.status(400).send(`Error connecting to Stripe: ${error.message}`);
     }
+}
+
+// Helper function to extract the reason from account requirements
+function getReasonFromRequirements(requirements) {
+    if (requirements.currently_due.length > 0) {
+        return 'Additional information is required to enable charges.';
+    }
+    if (requirements.errors.length > 0) {
+        return 'There were errors with your account setup.';
+    }
+    if (requirements.past_due.length > 0) {
+        return 'Some requirements are overdue.';
+    }
+    if (requirements.pending_verification.length > 0) {
+        return 'Your account is pending verification.';
+    }
+    return 'Charges are not enabled for an unspecified reason.';
 }
 
 
