@@ -1,4 +1,7 @@
-require("dotenv").config();
+// require("dotenv").config();
+//when you are in deveopement mode try to uncommend the above line 
+//and when you are in production mode try to comment the above line
+
 require("express-async-wrapper")
 const express = require("express");
 const cookiesParser = require('cookie-parser')
