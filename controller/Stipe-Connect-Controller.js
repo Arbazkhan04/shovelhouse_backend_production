@@ -28,6 +28,8 @@ const StripeCallback = async (req, res) => {
             code: code,
         });
 
+        cosnole.log(response);
+
         const stripeAccountId = response.stripe_user_id; // This is the connected account's ID
 
         // Save the stripeAccountId in your database, linked to the user
