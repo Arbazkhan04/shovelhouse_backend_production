@@ -2,7 +2,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const User = require('../models/User.js');
 
 const Connect = (req, res) => {
-    const userId = req.query.userId; // Get user ID from query parameters
+    const userId = req.params.userId; // Get user ID from query parameters
     if (!userId) {
         return res.status(400).send('User ID is required.');
     }
