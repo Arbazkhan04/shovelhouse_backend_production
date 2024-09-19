@@ -20,8 +20,101 @@ const server = http.createServer(app);
 
 
 //webhoool for stripe
+// app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
+//     console.log('Received Stripe event:');
+//     const sig = req.headers['stripe-signature'];
+//     const endpointSecret = 'whsec_34WmFnqyyJgpCmcP2WYMErkplbWCJ3v6';
+
+//     let event;
+
+//     try {
+//         event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+//     } catch (err) {
+//         console.error(`Webhook error: ${err.message}`);
+//         return res.status(400).send(`Webhook error: ${err.message}`);
+//     }
+
+//     if (event.type === 'checkout.session.completed') {
+//         const session = event.data.object;
+
+//         try {
+//             // Store the paymentIntent ID and update paymentStatus
+//             await Job.updateOne(
+//                 { stripeSessionId: session.id },
+//                 {
+//                     paymentStatus: 'authorized', // Set status to 'authorized'
+//                     paymentIntentId: session.payment_intent // Store payment intent for capture or refund
+//                 }
+//             );
+//             console.log('Payment status updated to authorized for session:', session.id);
+//         } catch (error) {
+//             console.error('Error updating payment status:', error);
+//         }
+//     }
+
+//     //handle stripe cancel event
+//     if (event.type === 'payment_intent.canceled') {
+//         const paymentIntent = event.data.object;
+
+//         try {
+//             const job = await Job.findOne({ paymentIntentId: paymentIntent.id });
+//             if (job) {
+//                 await Job.updateOne(
+//                     { _id: job._id },
+//                     { paymentStatus: 'canceled' }
+//                 );
+//                 console.log(`Payment intent ${paymentIntent.id} was canceled.`);
+//             }
+//         } catch (error) {
+//             console.error('Error handling payment_intent.canceled:', error);
+//         }
+//     }
+
+
+//     if (event.type === 'account.updated') {
+//         console.log('Account updated event received:', event.data.object);
+//         const account = event.data.object;
+//         const stripeAccountId = account.id; // Get the Stripe account ID
+//         const chargesEnabled = account.charges_enabled;
+
+//         let reason = 'no reason detected';
+//         if (!chargesEnabled) {
+//             if (account.verification && account.verification.disabled_reason) {
+//                 reason = `Charges are disabled due to verification issues: ${account.verification.disabled_reason}`;
+//             } else if (account.capabilities && account.capabilities.card_payments && account.capabilities.card_payments.state === 'inactive') {
+//                 reason = 'Charges are disabled because card payments capability is inactive.';
+//             } else if (account.capabilities && account.capabilities.transfers && account.capabilities.transfers.state === 'inactive') {
+//                 reason = 'Charges are disabled because transfers capability is inactive.';
+//             }
+//         }
+
+//         try {
+//             // Update the Shoveller's status in your database
+//             await User.updateOne(
+//                 { stripeAccountId },
+//                 {
+//                     stripeAccountStatus: chargesEnabled ? 'enabled' : 'restricted',
+//                     chargesEnabled,
+//                     reason
+//                 }
+//             );
+//             console.log('Account status updated for Stripe Account ID:', stripeAccountId);
+//         } catch (error) {
+//             console.error('Error updating user status:', error);
+//         }
+
+//         // Respond with a success message
+//         res.json({ success: chargesEnabled, message: reason });
+//     }
+
+
+//     res.json({ received: true });
+// });
+
+
+
+// Webhook for Stripe events
 app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
-    console.log('Received Stripe event:');
     const sig = req.headers['stripe-signature'];
     const endpointSecret = 'whsec_34WmFnqyyJgpCmcP2WYMErkplbWCJ3v6';
 
@@ -34,82 +127,117 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
         return res.status(400).send(`Webhook error: ${err.message}`);
     }
 
-    if (event.type === 'checkout.session.completed') {
-        const session = event.data.object;
-
-        try {
-            // Store the paymentIntent ID and update paymentStatus
-            await Job.updateOne(
-                { stripeSessionId: session.id },
-                {
-                    paymentStatus: 'authorized', // Set status to 'authorized'
-                    paymentIntentId: session.payment_intent // Store payment intent for capture or refund
-                }
-            );
-            console.log('Payment status updated to authorized for session:', session.id);
-        } catch (error) {
-            console.error('Error updating payment status:', error);
-        }
+    switch (event.type) {
+        case 'checkout.session.completed':
+            await handleCheckoutSessionCompleted(event.data.object);
+            break;
+        case 'payment_intent.canceled':
+            await handlePaymentIntentCanceled(event.data.object);
+            break;
+        case 'account.created':
+            await handleAccountCreated(event.data.object);
+            break;
+        case 'account.updated':
+            await handleAccountUpdated(event.data.object);
+            break;
+        default:
+            console.log(`Unhandled event type: ${event.type}`);
     }
-
-    //handle stripe cancel event
-    if (event.type === 'payment_intent.canceled') {
-        const paymentIntent = event.data.object;
-
-        try {
-            const job = await Job.findOne({ paymentIntentId: paymentIntent.id });
-            if (job) {
-                await Job.updateOne(
-                    { _id: job._id },
-                    { paymentStatus: 'canceled' }
-                );
-                console.log(`Payment intent ${paymentIntent.id} was canceled.`);
-            }
-        } catch (error) {
-            console.error('Error handling payment_intent.canceled:', error);
-        }
-    }
-
-
-    if (event.type === 'account.updated') {
-        console.log('Account updated event received:', event.data.object);
-        const account = event.data.object;
-        const stripeAccountId = account.id; // Get the Stripe account ID
-        const chargesEnabled = account.charges_enabled;
-
-        let reason = 'no reason detected';
-        if (!chargesEnabled) {
-            if (account.verification && account.verification.disabled_reason) {
-                reason = `Charges are disabled due to verification issues: ${account.verification.disabled_reason}`;
-            } else if (account.capabilities && account.capabilities.card_payments && account.capabilities.card_payments.state === 'inactive') {
-                reason = 'Charges are disabled because card payments capability is inactive.';
-            } else if (account.capabilities && account.capabilities.transfers && account.capabilities.transfers.state === 'inactive') {
-                reason = 'Charges are disabled because transfers capability is inactive.';
-            }
-        }
-
-        try {
-            // Update the Shoveller's status in your database
-            await User.updateOne(
-                { stripeAccountId },
-                {
-                    stripeAccountStatus: chargesEnabled ? 'enabled' : 'restricted',
-                    chargesEnabled,
-                    reason
-                }
-            );
-            console.log('Account status updated for Stripe Account ID:', stripeAccountId);
-        } catch (error) {
-            console.error('Error updating user status:', error);
-        }
-
-        // Respond with a success message
-        res.json({ success: chargesEnabled, message: reason });
-    }
-
 
     res.json({ received: true });
 });
+
+const handleCheckoutSessionCompleted = async (session) => {
+    try {
+        await Job.updateOne(
+            { stripeSessionId: session.id },
+            {
+                paymentStatus: 'authorized',
+                paymentIntentId: session.payment_intent
+            }
+        );
+        console.log('Payment status updated to authorized for session:', session.id);
+    } catch (error) {
+        console.error('Error updating payment status:', error);
+    }
+};
+
+const handlePaymentIntentCanceled = async (paymentIntent) => {
+    try {
+        const job = await Job.findOne({ paymentIntentId: paymentIntent.id });
+        if (job) {
+            await Job.updateOne(
+                { _id: job._id },
+                { paymentStatus: 'canceled' }
+            );
+            console.log(`Payment intent ${paymentIntent.id} was canceled.`);
+        }
+    } catch (error) {
+        console.error('Error handling payment_intent.canceled:', error);
+    }
+};
+
+const handleAccountCreated = async (account) => {
+    const stripeAccountId = account.id;
+    const chargesEnabled = account.charges_enabled;
+
+    let reason = 'Account created, but no additional details available yet.';
+    if (!chargesEnabled) {
+        if (account.verification && account.verification.disabled_reason) {
+            reason = `Charges are disabled due to verification issues: ${account.verification.disabled_reason}`;
+        } else if (account.capabilities.card_payments.state === 'inactive') {
+            reason = 'Charges are disabled because card payments capability is inactive.';
+        } else if (account.capabilities.transfers.state === 'inactive') {
+            reason = 'Charges are disabled because transfers capability is inactive.';
+        }
+    }
+
+    try {
+        // Store the new account details
+        await User.updateOne(
+            { stripeAccountId },
+            {
+                stripeAccountStatus: chargesEnabled ? 'enabled' : 'restricted',
+                chargesEnabled,
+                reason
+            },
+            { upsert: true } // Create the document if it doesn’t exist
+        );
+        console.log('Account created and status updated for Stripe Account ID:', stripeAccountId);
+    } catch (error) {
+        console.error('Error updating user status for newly created account:', error);
+    }
+};
+
+const handleAccountUpdated = async (account) => {
+    const stripeAccountId = account.id;
+    const chargesEnabled = account.charges_enabled;
+
+    let reason = 'no reason detected';
+    if (!chargesEnabled) {
+        if (account.verification && account.verification.disabled_reason) {
+            reason = `Charges are disabled due to verification issues: ${account.verification.disabled_reason}`;
+        } else if (account.capabilities.card_payments.state === 'inactive') {
+            reason = 'Charges are disabled because card payments capability is inactive.';
+        } else if (account.capabilities.transfers.state === 'inactive') {
+            reason = 'Charges are disabled because transfers capability is inactive.';
+        }
+    }
+
+    try {
+        await User.updateOne(
+            { stripeAccountId },
+            {
+                stripeAccountStatus: chargesEnabled ? 'enabled' : 'restricted',
+                chargesEnabled,
+                reason
+            }
+        );
+        console.log('Account status updated for Stripe Account ID:', stripeAccountId);
+    } catch (error) {
+        console.error('Error updating user status:', error);
+    }
+};
 
 
 
