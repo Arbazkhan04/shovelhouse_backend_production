@@ -53,19 +53,23 @@ const UserSchema = new mongoose.Schema({
   //stipe field for shoveller connect account in order to get details about him
   stripeAccountId: {
     type: String,
+    required: function() { return this.userRole === 'shoveller'; }, // Required only for shovellers
     default: undefined // Store Stripe account ID if applicable
   },
   stripeAccountStatus: {
     type: String,
+    required: function() { return this.userRole === 'shoveller'; }, // Required only for shovellers
     enum: ['enabled', 'restricted', 'pending'],
     default: 'pending' // Default status, change based on Stripe account status
   },
   chargesEnabled: {
     type: Boolean,
+    required: function() { return this.userRole === 'shoveller'; }, // Required only for shovellers
     default: false // Default to false, update based on Stripe account status
   },
   reason: {
     type: String,
+    required: function() { return this.userRole === 'shoveller'; }, // Required only for shovellers
     default: undefined // Store the reason if charges are not enabled
   },
 
