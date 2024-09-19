@@ -53,7 +53,7 @@ const UserSchema = new mongoose.Schema({
   //stipe field for shoveller connect account in order to get details about him
   stripeAccountId: {
     type: String,
-    default: null // Store Stripe account ID if applicable
+    default: undefined // Store Stripe account ID if applicable
   },
   stripeAccountStatus: {
     type: String,
@@ -66,7 +66,7 @@ const UserSchema = new mongoose.Schema({
   },
   reason: {
     type: String,
-    default: null // Store the reason if charges are not enabled
+    default: undefined // Store the reason if charges are not enabled
   },
 
 
