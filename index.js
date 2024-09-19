@@ -21,7 +21,7 @@ const server = http.createServer(app);
 
 //webhoool for stripe
 app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
-    console.log('Received Stripe event:', req.body);
+    console.log('Received Stripe event:');
     const sig = req.headers['stripe-signature'];
     const endpointSecret = 'whsec_34WmFnqyyJgpCmcP2WYMErkplbWCJ3v6';
 
