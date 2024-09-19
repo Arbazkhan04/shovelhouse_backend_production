@@ -58,7 +58,7 @@ const register = async (req, res) => {
       res.status(StatusCodes.CREATED).json({ user: { name: user.userName }, token });
     } catch (err) {
       console.log('Error during user registration:', err);
-      res.status(400).json({ error: 'Invalid User Data' message: err.message });
+      res.status(400).json({ error: 'Invalid User Data', message: err.message });
     }
   });
 };
