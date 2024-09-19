@@ -13,7 +13,7 @@ const Connect = (req, res) => {
 }
 
 const StripeCallback = async (req, res) => {
-    console.log("hello")
+    console.log("Stripe Callback Endpoint Hit");
     const code = req.query.code; // The authorization code from Stripe
     const state = req.query.state; // The state parameter from Stripe
 
@@ -22,25 +22,30 @@ const StripeCallback = async (req, res) => {
         const decodedState = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
         const userId = decodedState.userId; // Extract user ID
 
-        // Exchange authorization code for an account token
-        const response = await stripe.oauth.token({
+        // Exchange authorization code for an access token
+        const tokenResponse = await stripe.oauth.token({
             grant_type: 'authorization_code',
             code: code,
         });
 
-        console.log(response);
+        console.log('Stripe OAuth Token Response:', tokenResponse);
 
-        const stripeAccountId = response.stripe_user_id; // This is the connected account's ID
+        const stripeAccountId = tokenResponse.stripe_user_id; // This is the connected account's ID
+
+        // Retrieve the connected account details
+        const account = await stripe.accounts.retrieve(stripeAccountId);
+
+        console.log('Stripe Account Details:', account);
 
         // Save the stripeAccountId in your database, linked to the user
         await User.updateOne({ _id: userId }, { stripeAccountId });
 
-        res.send(`Account connected! Stripe Account ID: ${stripeAccountId}`);
+        res.send(`Account connected! Stripe Account ID: ${stripeAccountId}. Account details: ${JSON.stringify(account)}`);
     } catch (error) {
+        console.error('Error connecting to Stripe:', error); // Log error for debugging
         res.status(400).send(`Error connecting to Stripe: ${error.message}`);
     }
 }
-
 
 
 
