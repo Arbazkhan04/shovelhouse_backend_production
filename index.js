@@ -1,4 +1,4 @@
-require("dotenv").config();
+// require("dotenv").config();
 //when you are in deveopement mode try to uncommend the above line 
 //and when you are in production mode try to comment the above line
 
@@ -10,6 +10,8 @@ const cors = require('cors')
 const bodyParser = require('body-parser')
 const http = require('http'); // Import the HTTP library
 const configureSocket = require('./socket/index.js'); // Import the Socket.IO configuration
+const Job = require('./models/Job.js')
+const User = require('./models/User.js')
 require('./utlis/Scheduler.js')
 
 const app = express();
