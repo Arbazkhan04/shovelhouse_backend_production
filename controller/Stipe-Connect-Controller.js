@@ -28,7 +28,7 @@ const StripeCallback = async (req, res) => {
             code: code,
         });
 
-        cosnole.log(response);
+        console.log(response);
 
         const stripeAccountId = response.stripe_user_id; // This is the connected account's ID
 
