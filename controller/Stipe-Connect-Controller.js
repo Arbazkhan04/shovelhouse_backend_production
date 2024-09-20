@@ -56,10 +56,16 @@ const StripeCallback = async (req, res) => {
             }
         );
 
-        res.send(`Account connected! Stripe Account ID: ${stripeAccountId}. Account details: ${JSON.stringify(account)}`);
+        res.json({
+            message: 'Account connected successfully!',
+            stripeAccountId,
+            chargesEnabled,
+            stripeAccountStatus,
+            accountDetails: account,
+        });
     } catch (error) {
         console.error('Error connecting to Stripe:', error); // Log error for debugging
-        res.status(400).send(`Error connecting to Stripe: ${error.message}`);
+        res.status(400).json({ error: `Error connecting to Stripe: ${error.message}` });
     }
 }
 
