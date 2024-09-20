@@ -45,24 +45,44 @@ const StripeCallback = async (req, res) => {
         const stripeAccountStatus = chargesEnabled ? 'enabled' : 'restricted';
         const reason = chargesEnabled ? null : getReasonFromRequirements(account.requirements);
 
-        // Save the stripeAccountId and details in your database, linked to the user
-        await User.updateOne(
-            { _id: userId },
+        /// Update the user in your database
+        const user = await User.findByIdAndUpdate(
+            userId,
             {
                 stripeAccountId,
                 stripeAccountStatus,
                 chargesEnabled,
-                reason
-            }
+                reason,
+            },
+            { new: true } // Return the updated user
         );
 
-        res.json({
-            message: 'Account connected successfully!',
-            stripeAccountId,
-            chargesEnabled,
-            stripeAccountStatus,
-            accountDetails: account,
-        });
+        // Check if the user exists
+        if (user) {
+            // Generate token (assuming you have a method to create it)
+            const token = user.createJWT(); // Ensure you have a method to create a JWT token
+
+            // Send a conditional response based on user role
+            if (user.userRole === 'houseOwner') {
+                res.status(StatusCodes.CREATED).json({ 
+                    user: { id: user._id, role: user.userRole }, 
+                    token 
+                });
+            } else if (user.userRole === 'shoveller') {
+                res.status(StatusCodes.CREATED).json({ 
+                    user: { id: user._id, role: user.userRole, chargesEnabled: user.chargesEnabled, stripeAccountId: user.stripeAccountId }, 
+                    token 
+                });
+            } else if (user.userRole === 'admin') {
+                res.status(StatusCodes.CREATED).json({ 
+                    user: { id: user._id, role: user.userRole }, 
+                    token 
+                });
+            }
+        } else {
+            res.status(404).json({ error: 'User not found.' });
+        }
+        
     } catch (error) {
         console.error('Error connecting to Stripe:', error); // Log error for debugging
         res.status(400).json({ error: `Error connecting to Stripe: ${error.message}` });

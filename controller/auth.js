@@ -28,7 +28,7 @@ const register = async (req, res) => {
     }
 
     try {
-      
+
       const userId = uuidv4();
       const imageName = `${userId}.jpg`;
       let imageUrl;
@@ -37,19 +37,19 @@ const register = async (req, res) => {
       if (req.body.image) {
         const base64Data = req.body.image.replace(/^data:image\/\w+;base64,/, "");
         const buffer = Buffer.from(base64Data, 'base64');
-    
+
         const uploadParams = {
-            Bucket: S3_BUCKET,
-            Key: imageName,
-            Body: buffer,
-            ContentType: req.file ? req.file.mimetype : 'image/jpeg', // Fallback content type
+          Bucket: S3_BUCKET,
+          Key: imageName,
+          Body: buffer,
+          ContentType: req.file ? req.file.mimetype : 'image/jpeg', // Fallback content type
         };
-    
+
         const command = new PutObjectCommand(uploadParams);
         await s3.send(command);
-    
+
         imageUrl = `https://${S3_BUCKET}.s3.amazonaws.com/${imageName}`;
-    }
+      }
 
       // Create the user in the database, including the imageUrl
       const user = await User.create({ ...req.body, imageUrl });
@@ -57,7 +57,35 @@ const register = async (req, res) => {
       // Generate a JWT token
       const token = user.createJWT();
 
-      res.status(StatusCodes.CREATED).json({ user: { role: user.userRole }, token });
+      // Send response based on user role
+      if (user.userRole === 'houseOwner') {
+        res.status(StatusCodes.CREATED).json({
+          user: {
+            id: user._id,
+            role: user.userRole
+          },
+          token
+        });
+      } else if (user.userRole === 'shoveller') {
+        res.status(StatusCodes.CREATED).json({
+          user: {
+            id: user._id,
+            role: user.userRole,
+            chargesEnabled: user.chargesEnabled,
+            stripeAccountId: user.stripeAccountId
+          },
+          token
+        });
+      } else if (user.userRole === 'admin') {
+        res.status(StatusCodes.CREATED).json({
+          user: {
+            id: user._id,
+            role: user.userRole
+          },
+          token
+        });
+      }
+
     } catch (err) {
       console.log('Error during user registration:', err);
       res.status(400).json({ error: 'Invalid User Data', message: err.message });
@@ -66,105 +94,132 @@ const register = async (req, res) => {
 };
 
 const login = async (req, res) => {
-    const { email, password } = req.body
+  const { email, password } = req.body
 
-    if (!email || !password) {
-      throw new BadRequestError('Please provide email and password')
-    }
-    const user = await User.findOne({ email })
-    if (!user) {
-      throw new UnauthenticatedError('Invalid Credentials')
-    }
-    const isPasswordCorrect = await user.comparePassword(password)
-    if (!isPasswordCorrect) {
-      throw new UnauthenticatedError('Invalid Credentials')
-    }
-    // compare password
-    const token = user.createJWT()
-    res.status(StatusCodes.OK).json({ user: { role: user.userRole }, token })
+  if (!email || !password) {
+    throw new BadRequestError('Please provide email and password')
+  }
+  const user = await User.findOne({ email })
+  if (!user) {
+    throw new UnauthenticatedError('Invalid Credentials')
+  }
+  const isPasswordCorrect = await user.comparePassword(password)
+  if (!isPasswordCorrect) {
+    throw new UnauthenticatedError('Invalid Credentials')
+  }
+  // compare password
+  const token = user.createJWT()
+  // Send response based on user role
+  if (user.userRole === 'houseOwner') {
+    res.status(StatusCodes.CREATED).json({
+      user: {
+        id: user._id,
+        role: user.userRole
+      },
+      token
+    });
+  } else if (user.userRole === 'shoveller') {
+    res.status(StatusCodes.CREATED).json({
+      user: {
+        id: user._id,
+        role: user.userRole,
+        chargesEnabled: user.chargesEnabled,
+        stripeAccountId: user.stripeAccountId
+      },
+      token
+    });
+  } else if (user.userRole === 'admin') {
+    res.status(StatusCodes.CREATED).json({
+      user: {
+        id: user._id,
+        role: user.userRole
+      },
+      token
+    });
+  }
+}
+
+
+const getAllUsers = async (req, res) => {
+  const users = await User.find({}).sort('createdAt')
+  res.status(StatusCodes.OK).json({ users, count: users.length })
+}
+
+
+const forgotPassword = async (req, res) => {
+  const { email } = req.body
+
+  const user = await User.findOne({ email })
+  if (!user) {
+    throw new BadRequestError('No user with this email address')
   }
 
+  // Generate and get reset password token
+  const resetToken = user.getResetPasswordToken()
 
-  const getAllUsers = async (req, res) => {
-    const users = await User.find({}).sort('createdAt')
-    res.status(StatusCodes.OK).json({ users, count: users.length })
-  }
+  // Save the user with the reset token and expiration time
+  await user.save()
 
+  // Create reset URL
+  const resetUrl = `https://yourdomain.com/reset-password/${resetToken}`
 
-  const forgotPassword = async (req, res) => {
-    const { email } = req.body
-
-    const user = await User.findOne({ email })
-    if (!user) {
-      throw new BadRequestError('No user with this email address')
-    }
-
-    // Generate and get reset password token
-    const resetToken = user.getResetPasswordToken()
-
-    // Save the user with the reset token and expiration time
-    await user.save()
-
-    // Create reset URL
-    const resetUrl = `https://yourdomain.com/reset-password/${resetToken}`
-
-    const message = `
+  const message = `
     You requested a password reset. Please click on the link below to reset your password:
     ${resetUrl}
   `
 
-    try {
-      await sendEmail({
-        to: user.email,
-        subject: 'Password Reset Request',
-        text: message,
-      })
-      
-      res.status(StatusCodes.OK).json({ success: true, data: 'Email sent' })
-    } catch (error) {
-      user.resetPasswordToken = undefined
-      user.resetPasswordExpire = undefined
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: 'Password Reset Request',
+      text: message,
+    })
 
-      await user.save()
+    res.status(StatusCodes.OK).json({ success: true, data: 'Email sent' })
+  } catch (error) {
+    user.resetPasswordToken = undefined
+    user.resetPasswordExpire = undefined
 
-      throw new BadRequestError(error.message)
-    }
+    await user.save()
+
+    throw new BadRequestError(error.message)
   }
+}
 
-  const resetPassword = async (req, res) => {
-    
-    try {
-      
-      const resetPasswordToken = crypto.createHash('sha256').update(req.params.resetToken).digest('hex')
+const resetPassword = async (req, res) => {
 
-      const user = await User.findOne({
-        resetPasswordToken,
-        resetPasswordExpire: { $gt: Date.now() },
-      })
+  try {
 
-      if (!user) {
-        throw new BadRequestError('Invalid or expired token')
-      }
+    const resetPasswordToken = crypto.createHash('sha256').update(req.params.resetToken).digest('hex')
 
-      // Set new password
-      user.password = req.body.password
-      user.resetPasswordToken = undefined
-      user.resetPasswordExpire = undefined
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    })
 
-      await user.save()
-
-      res.status(StatusCodes.OK).json({ success: true, data: 'Password reset successful' })
+    if (!user) {
+      throw new BadRequestError('Invalid or expired token')
     }
-    catch (err) {
-      res.status(500).json({ err: err.message })
-      
-    }
-  }
 
-  module.exports = {
-    register,
-    login,
-    forgotPassword,
-    getAllUsers,
-    resetPassword,
+    // Set new password
+    user.password = req.body.password
+    user.resetPasswordToken = undefined
+    user.resetPasswordExpire = undefined
+
+    await user.save()
+
+    res.status(StatusCodes.OK).json({ success: true, data: 'Password reset successful' })
   }
+  catch (err) {
+    res.status(500).json({ err: err.message })
+
+  }
+}
+
+module.exports = {
+  register,
+  login,
+  forgotPassword,
+  getAllUsers,
+  resetPassword,
+}
