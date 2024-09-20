@@ -118,7 +118,7 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
 
 // middlewares
 app.use(cors({
-    origin: 'http://localhost:3000',
+    origin: ['http://localhost:3000', 'https://shovel-house-b93eaebaf538.herokuapp.com'],
     credentials: true
 }));
 app.use(express.json());

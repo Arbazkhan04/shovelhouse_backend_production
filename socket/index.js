@@ -5,7 +5,7 @@ const Chat = require('../models/chat.js');
 const configureSocket = (server) => {
     const io = socketIo(server, {
         cors: {
-          origin: 'http://localhost:3000', // Allow your frontend to connect
+          origin: ['http://localhost:3000', 'https://shovel-house-b93eaebaf538.herokuapp.com'],
           methods: ['GET', 'POST'],
           credentials: true
         }
