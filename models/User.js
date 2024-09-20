@@ -53,7 +53,7 @@ const UserSchema = new mongoose.Schema({
   //stipe field for shoveller connect account in order to get details about him
   stripeAccountId: {
     type: String,
-    required: function() { return this.userRole === 'shoveller' && !this.stripeAccountId; }, // Required only for shovellers
+    required: function() { return this.userRole === 'shoveller' }, // Required only for shovellers
     default: '' // Store Stripe account ID if applicable
   },
   stripeAccountStatus: {
