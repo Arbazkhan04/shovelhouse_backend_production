@@ -5,7 +5,8 @@ const Chat = require('../models/chat.js');
 const configureSocket = (server) => {
   const io = socketIo(server, {
     cors: {
-      origin: '*'
+      origin: 'https://shovel-house.vercel.app', // The correct frontend URL
+      methods: ['GET', 'POST'], // Include the necessary methods
     }
   });
 

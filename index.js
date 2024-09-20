@@ -118,8 +118,8 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
 
 // middlewares
 app.use(cors({
-    origin: ['http://localhost:3000', 'https://shovel-house-b93eaebaf538.herokuapp.com', 'https://shovel-house.vercel.app'],
-    credentials: true
+    origin: ['https://shovel-house.vercel.app', 'https://shovel-house-b93eaebaf538.herokuapp.com'],
+    methods: ['GET', 'POST'], // Adjust methods as needed
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
