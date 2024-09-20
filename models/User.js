@@ -54,7 +54,7 @@ const UserSchema = new mongoose.Schema({
   stripeAccountId: {
     type: String,
     required: function() { return this.userRole === 'shoveller' }, // Required only for shovellers
-    default: '' // Store Stripe account ID if applicable
+    default: 'none' // Store Stripe account ID if applicable
   },
   stripeAccountStatus: {
     type: String,
