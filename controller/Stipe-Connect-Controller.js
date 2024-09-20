@@ -9,7 +9,8 @@ const Connect = (req, res) => {
     const state = Buffer.from(JSON.stringify({ userId })).toString('base64'); // Encode userId in the state parameter
 
     const stripeOAuthUrl = `https://connect.stripe.com/oauth/authorize?response_type=code&client_id=${process.env.STRIPE_CLIENT_ID}&scope=read_write&state=${state}&redirect_uri=${process.env.STRIPE_REDIRECT_URI}`;
-    res.redirect(stripeOAuthUrl);
+    res.json({ stripeUrl: stripeOAuthUrl });
+
 }
 
 
