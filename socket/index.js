@@ -3,13 +3,11 @@ const socketIo = require('socket.io');
 const Chat = require('../models/chat.js');
 
 const configureSocket = (server) => {
-    const io = socketIo(server, {
-        cors: {
-          origin: ['http://localhost:3000', 'https://shovel-house-b93eaebaf538.herokuapp.com','https://shovel-house.vercel.app'],
-          methods: ['GET', 'POST'],
-          credentials: true
-        }
-      });
+  const io = socketIo(server, {
+    cors: {
+      origin: '*'
+    }
+  });
 
   io.on('connection', (socket) => {
     console.log('New user connected:', socket.id);
