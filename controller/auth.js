@@ -34,20 +34,22 @@ const register = async (req, res) => {
       let imageUrl;
 
       // Check if an image was uploaded
-      if (req.file) {
-        // Create a PutObjectCommand to upload the image to S3
+      if (req.body.image) {
+        const base64Data = req.body.image.replace(/^data:image\/\w+;base64,/, "");
+        const buffer = Buffer.from(base64Data, 'base64');
+    
         const uploadParams = {
-          Bucket: S3_BUCKET,
-          Key: imageName,
-          Body: req.file.buffer,
-          ContentType: req.file.mimetype,
+            Bucket: S3_BUCKET,
+            Key: imageName,
+            Body: buffer,
+            ContentType: req.file ? req.file.mimetype : 'image/jpeg', // Fallback content type
         };
-
+    
         const command = new PutObjectCommand(uploadParams);
         await s3.send(command);
-
+    
         imageUrl = `https://${S3_BUCKET}.s3.amazonaws.com/${imageName}`;
-      }
+    }
 
       // Create the user in the database, including the imageUrl
       const user = await User.create({ ...req.body, imageUrl });
