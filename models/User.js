@@ -54,7 +54,7 @@ const UserSchema = new mongoose.Schema({
   stripeAccountId: {
     type: String,
     required: function() { return this.userRole === 'shoveller'; }, // Required only for shovellers
-    default: undefined // Store Stripe account ID if applicable
+    default: '' // Store Stripe account ID if applicable
   },
   stripeAccountStatus: {
     type: String,
@@ -70,7 +70,7 @@ const UserSchema = new mongoose.Schema({
   reason: {
     type: String,
     required: function() { return this.userRole === 'shoveller'; }, // Required only for shovellers
-    default: undefined // Store the reason if charges are not enabled
+    default: "User haven't setup stripe yest" // Store the reason if charges are not enabled
   },
 
 
