@@ -1,4 +1,5 @@
 const Job = require('../models/Job');
+const User = require('../models/User');
 const { BadRequestError, NotFoundError } = require('../errors/index');
 const {StatusCodes} = require('http-status-codes')
 
@@ -14,14 +15,38 @@ const getAllJobs = async (req, res) => {
   
 
 const createJob = async (req, res) => { 
-    try {
-        req.body.houseOwnerId = req.params.houseOwnerId;
-        const job = await Job.create({...req.body});
-        res.status(StatusCodes.CREATED).json({ job: job });
-    }
-    catch (err) {
-        throw new BadRequestError("invalid job data")
-    }
+  try {
+      req.body.houseOwnerId = req.params.houseOwnerId;
+      const job = await Job.create({ ...req.body });
+      const user = await User.findById(req.params.houseOwnerId); // Assuming you have a User model
+
+      if (!user) {
+          return res.status(StatusCodes.NOT_FOUND).json({ error: "Houseowner id not found in User" });
+      }
+
+      const token = user.createJWT();
+
+      // Send response based on user role
+      if (user.userRole === 'houseOwner') {
+          return res.status(StatusCodes.CREATED).json({
+              user: {
+                  jobId: job._id,
+                  id: user._id,
+                  role: user.userRole,
+                  paymentOffering:job.paymentInfo.amount,
+                  jobStatus: job.jobStatus,
+                  paymentStatus: job.paymentInfo.status
+              },
+              token
+          });
+      }
+
+      // If the user is not a houseOwner
+      return res.status(StatusCodes.BAD_REQUEST).json({ error: "Invalid job data && role" });
+
+  } catch (err) {
+      throw new BadRequestError("Invalid job data");
+  }
 }
 
 

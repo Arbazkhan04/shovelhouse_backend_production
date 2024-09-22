@@ -5,7 +5,7 @@ const { auth, authorizeRoles } = require('../middleware/authentication')
 
 router.get('/getAllJobs',auth,authorizeRoles('admin'), getAllJobs)
 router.get('/findJob',auth,authorizeRoles('shoveller'), findJob)
-router.post('/createJob/:houseOwnerId',auth,authorizeRoles('houseOwner'), createJob)
+router.post('/createJob/:houseOwnerId', createJob)
 router.get('/getJob/:jobId', getJob)
 router.patch('/updateJob/:jobId', updateJob)
     

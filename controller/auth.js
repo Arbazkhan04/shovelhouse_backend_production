@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Job = require('../models/Job');
 const { StatusCodes } = require('http-status-codes');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
@@ -6,6 +7,7 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { BadRequestError } = require('../errors')
 const sendEmail = require('../utlis/sendEmail.js')
 const crypto = require('crypto')
+
 
 // Initialize S3Client with credentials and region
 const s3 = new S3Client({
@@ -20,6 +22,104 @@ const S3_BUCKET = process.env.S3_BUCKET_NAME;
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
+
+// const register = async (req, res) => {
+//   upload.single('image')(req, res, async (err) => {
+//     if (err) {
+//       return res.status(500).json({ error: err.message });
+//     }
+
+//     try {
+
+//       const userId = uuidv4();
+//       const imageName = `${userId}.jpg`;
+//       let imageUrl;
+
+//       // Check if an image was uploaded
+//       if (req.body.image) {
+//         const base64Data = req.body.image.replace(/^data:image\/\w+;base64,/, "");
+//         const buffer = Buffer.from(base64Data, 'base64');
+
+//         const uploadParams = {
+//           Bucket: S3_BUCKET,
+//           Key: imageName,
+//           Body: buffer,
+//           ContentType: req.file ? req.file.mimetype : 'image/jpeg', // Fallback content type
+//         };
+
+//         const command = new PutObjectCommand(uploadParams);
+//         await s3.send(command);
+
+//         imageUrl = `https://${S3_BUCKET}.s3.amazonaws.com/${imageName}`;
+//       }
+
+//       // Create the user in the database, including the imageUrl
+//       const user = await User.create({ ...req.body, imageUrl });
+
+//       // Generate a JWT token
+//       const token = user.createJWT();
+
+//       // Send response based on user role
+//       if (user.userRole === 'houseOwner') {
+//         //search on job as well to get the job details
+//         const isJobPostedByHouseOwner = await Job.find({
+//           houseOwnerId: user._id,
+//           $or: [
+//               { jobStatus: 'open' },
+//               { jobStatus: 'in progress' }
+//           ]
+//       });
+
+//         //check houseowner job posted status 
+//         if(isJobPostedByHouseOwner){
+//           res.status(StatusCodes.CREATED).json({
+//             user: {
+//               jobId: isJobPostedByHouseOwner._id,
+//               id: user._id,
+//               role: user.userRole,
+//               jobStatus: isJobPostedByHouseOwner.jobStatus,
+//               paymentStatus: isJobPostedByHouseOwner.paymentInfo.status
+//             },
+//             token
+//           });
+//         }
+//         else{
+
+//           res.status(StatusCodes.CREATED).json({
+//             user: {
+//               id: user._id,
+//               role: user.userRole
+//             },
+//             token
+//           });
+//         }
+
+//       } else if (user.userRole === 'shoveller') {
+//         res.status(StatusCodes.CREATED).json({
+//           user: {
+//             id: user._id,
+//             role: user.userRole,
+//             chargesEnabled: user.chargesEnabled,
+//             stripeAccountId: user.stripeAccountId
+//           },
+//           token
+//         });
+//       } else if (user.userRole === 'admin') {
+//         res.status(StatusCodes.CREATED).json({
+//           user: {
+//             id: user._id,
+//             role: user.userRole
+//           },
+//           token
+//         });
+//       }
+
+//     } catch (err) {
+//       console.log('Error during user registration:', err);
+//       res.status(400).json({ error: 'Invalid User Data', message: err.message });
+//     }
+//   });
+// };
 
 const register = async (req, res) => {
   upload.single('image')(req, res, async (err) => {
@@ -85,7 +185,9 @@ const register = async (req, res) => {
           token
         });
       }
-
+      else{
+        res.status(400).json({ error: 'Invalid user role' });
+      }
     } catch (err) {
       console.log('Error during user registration:', err);
       res.status(400).json({ error: 'Invalid User Data', message: err.message });
@@ -111,13 +213,40 @@ const login = async (req, res) => {
   const token = user.createJWT()
   // Send response based on user role
   if (user.userRole === 'houseOwner') {
-    res.status(StatusCodes.CREATED).json({
-      user: {
-        id: user._id,
-        role: user.userRole
-      },
-      token
+    //search on job as well to get the job details
+    const isJobPostedByHouseOwner = await Job.find({
+      houseOwnerId: user._id,
+      $or: [
+        { jobStatus: 'open' },
+        { jobStatus: 'in progress' }
+      ]
     });
+
+    //check houseowner job posted status 
+    if (isJobPostedByHouseOwner.length > 0) {
+      const job = isJobPostedByHouseOwner[0]; // Access the first job in the array
+      res.status(StatusCodes.CREATED).json({
+        user: {
+          jobId: job._id,
+          id: user._id,
+          role: user.userRole,
+          paymentOffering:job.paymentInfo.amount,
+          jobStatus: job.jobStatus,
+          paymentStatus: job.paymentInfo.status
+        },
+        token
+      });
+    }
+    else {
+      res.status(StatusCodes.CREATED).json({
+        user: {
+          id: user._id,
+          role: user.userRole
+        },
+        token
+      });
+    }
+
   } else if (user.userRole === 'shoveller') {
     res.status(StatusCodes.CREATED).json({
       user: {
