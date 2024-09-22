@@ -33,18 +33,21 @@ const jobSchema = new Schema({
       required: true,
     }
   },
-  scheduledTime: {
-    type: Number,  // Unix timestamp (in milliseconds)
-    required: true,
+
+  scheduledTime:{
+    hour:{type:String, required:true},
+    minute:{type:String, required:true},
+    period:{type:String, required:true}
   },
+
   completionTime: {
     type: Number,  // Unix timestamp (in milliseconds)
     required: false,
   },
   paymentInfo: {
     amount: { type: Number, required: true },  // Total amount
-    status: { type: String, enum: ['pending', 'completed'], default: 'pending' },
-    method: { type: String, enum: ['stripe', 'paypal', 'applepay'], required: true },
+    status: { type: String, enum: ['pending', 'authorize','capture','canceled'], default: 'pending' },
+    method: { type: String, enum: ['stripe', 'paypal', 'applepay'], default: 'stripe' },
   },
   jobStatus: {
     type: String,
@@ -52,6 +55,13 @@ const jobSchema = new Schema({
     default: 'open',
     required: true,
   },
+  stripeSessionId: {
+    type: String,
+  },
+  paymentIntentId: { // Add a new field to store the paymentIntentId
+    type: String
+  },
+
   jobRating: {
     type: Number,
     min: 1,

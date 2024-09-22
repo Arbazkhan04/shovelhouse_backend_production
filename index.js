@@ -1,4 +1,4 @@
-// require("dotenv").config();
+require("dotenv").config();
 //when you are in deveopement mode try to uncommend the above line 
 //and when you are in production mode try to comment the above line
 
@@ -42,8 +42,10 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
             await Job.updateOne(
                 { stripeSessionId: session.id },
                 {
-                    paymentStatus: 'authorized', // Set status to 'authorized'
-                    paymentIntentId: session.payment_intent // Store payment intent for capture or refund
+                    $set: {
+                        'paymentInfo.status': 'authorized',
+                        paymentIntentId: session.payment_intent
+                    }
                 }
             );
             console.log('Payment status updated to authorized for session:', session.id);
@@ -134,6 +136,8 @@ app.use('/api/auth', require('./routes/AuthRouter.js'));
 //app.use('/api/job', require('./middleware/authentication.js'), require('./routes/JobRouter.js'))
 app.use('/api/job', require('./routes/JobRouter.js'))
 app.use('/api/oauth', require('./routes/StripeConnect.js'));
+
+app.use('/api/stripe', require('./routes/StripeCheckoutRouter.js'));
 
 app.use(require('./middleware/not-found.js'));
 app.use(require('./middleware/error-handler.js'));
