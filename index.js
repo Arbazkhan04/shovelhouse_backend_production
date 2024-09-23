@@ -4,7 +4,7 @@
 
 require("express-async-wrapper")
 const express = require("express");
-const cookiesParser = require('cookie-parser')
+// const cookiesParser = require('cookie-parser')
 const connectDb = require('./db/connect.js')
 const cors = require('cors')
 const bodyParser = require('body-parser')
@@ -125,7 +125,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookiesParser())
+// app.use(cookiesParser())
 
 
 
