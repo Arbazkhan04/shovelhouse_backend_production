@@ -17,6 +17,10 @@ const jobSchema = new Schema({
       type: Number,  // Unix timestamp (in milliseconds)
       required: false,
     },
+    isShovellerAccepted:{
+      type: Boolean,
+      required:false
+    },
   },
   services: {
     type: [String],  // Array of services (strings)
@@ -61,7 +65,10 @@ const jobSchema = new Schema({
   paymentIntentId: { // Add a new field to store the paymentIntentId
     type: String
   },
-
+  isHouseOwnerAccepted:{
+    type: Boolean,
+    default:false
+  },
   jobRating: {
     type: Number,
     min: 1,

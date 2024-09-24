@@ -12,6 +12,37 @@ const getAllJobs = async (req, res) => {
     throw new BadRequestError("invalid job data")
    }
 }
+
+
+const updateJobStatusForShovellerAcceptedJob = async (req, res) => {
+  try {
+    const { jobId, shovellerId } = req.body;
+
+    // Find the job by its ID and update the shoveller-related fields
+    const updatedJob = await Job.findByIdAndUpdate(
+      jobId, // This is the job's ID
+      {
+        $set: {
+          'ShovelerInfo.ShovelerId': shovellerId,  // Update ShovelerId
+          'ShovelerInfo.isShovellerAccepted': true,  // Set the accepted status to true
+          'ShovelerInfo.acceptedAt': Date.now(), // Set the accepted timestamp
+        }
+      },
+      { new: true } // Return the updated document
+    );
+
+    if (!updatedJob) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    return res.status(200).json({ message: "Job updated successfully", updatedJob });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Error updating the job" });
+  }
+}
+
+
   
 
 const createJob = async (req, res) => { 
@@ -49,6 +80,50 @@ const createJob = async (req, res) => {
   }
 }
 
+const updateStatusForHouseOwnerAcceptedJob = async (req, res) => {
+  try {
+    const { jobId } = req.body;
+
+    // Find the job by its ID and update the shoveller-related fields
+    const updatedJob = await Job.findByIdAndUpdate(
+      jobId, // This is the job's ID
+      {
+        $set: {
+          'isHouseOwnerAccepted': true,  // Set the accepted status to true
+        }
+      },
+      { new: true } // Return the updated document
+    );
+
+    if (!updatedJob) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    //find houseOnwer 
+    const user = await User.findById(updatedJob.houseOwnerId); // Assuming you have a User model
+    if(!user){
+      return res.status(StatusCodes.NOT_FOUND).json({ error: "Houseowner id not found in User" });
+    }
+    const token = user.createJWT();
+
+   return res.status(StatusCodes.CREATED).json({
+      user: {
+        jobId: updatedJob._id,
+        id: updatedJob.houseOwnerId,
+        role: "houseOwner",
+        paymentOffering:updatedJob.paymentInfo.amount,
+        jobStatus: updatedJob.jobStatus,
+        paymentStatus: updatedJob.paymentInfo.status,
+        shovellerId: updatedJob.ShovelerInfo.ShovelerId,
+      },
+      token
+    });  
+  } 
+    catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Error updating the job" });
+  }
+}
 
  const getJob = async (req, res) => {
     const jobId = req.params.jobId
@@ -170,5 +245,7 @@ module.exports = {
   createJob,
   getJob,
   findJob,
-  updateJob
+  updateJob,
+  updateJobStatusForShovellerAcceptedJob,
+  updateStatusForHouseOwnerAcceptedJob
   }
