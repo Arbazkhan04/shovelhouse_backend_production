@@ -16,7 +16,7 @@ const UserSchema = new mongoose.Schema({
   },
   name:{
     type: String,
-    required: function() { return this.userRole !== 'houseOnwer'; }  // Required for shoveller and house
+    required: function() { return this.userRole !== 'admin'; }  // Required for shoveller and house
   },
   email: {
     type: String,
