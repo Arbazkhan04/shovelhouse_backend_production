@@ -290,7 +290,7 @@ const forgotPassword = async (req, res) => {
   await user.save()
 
   // Create reset URL
-  const resetUrl = `https://yourdomain.com/reset-password/${resetToken}`
+  const resetUrl = `http://localhost:3000/resetPassword/${resetToken}`
 
   const message = `
     You requested a password reset. Please click on the link below to reset your password:
