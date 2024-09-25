@@ -195,8 +195,9 @@ const register = async (req, res) => {
   });
 };
 
-const login = async (req, res) => {
-  const { email, password } = req.body
+const login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body
 
   if (!email || !password) {
     throw new BadRequestError('Please provide email and password')
@@ -266,6 +267,9 @@ const login = async (req, res) => {
       token
     });
   }
+  } catch (error) {
+    next(error)
+  }
 }
 
 
@@ -275,8 +279,9 @@ const getAllUsers = async (req, res) => {
 }
 
 
-const forgotPassword = async (req, res) => {
-  const { email } = req.body
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body
 
   const user = await User.findOne({ email })
   if (!user) {
@@ -312,6 +317,9 @@ const forgotPassword = async (req, res) => {
     await user.save()
 
     throw new BadRequestError(error.message)
+  }
+  } catch (error) {
+    next(error)
   }
 }
 
