@@ -353,10 +353,37 @@ const resetPassword = async (req, res) => {
   }
 }
 
+const updateUser = async (req, res, next) => {
+  try {
+    const { id: userId } = req.params
+    const user = await User.findByIdAndUpdate(userId, req.body, { new: true, runValidators: true })
+    if (!user) {
+      throw new BadRequestError('No user found with this ID')
+    }
+    res.status(StatusCodes.OK).json({ user })
+  } catch (error) {
+    next(error)
+  }
+}
+
+const searchUsers = async (req, res, next) => {
+  try {
+    const users = await User.find(req.body)
+    if (!users) {
+      throw new BadRequestError('No users found')
+    }
+    res.status(StatusCodes.OK).json({ users })
+  } catch (error) {
+    next(error)
+  }
+}
+
 module.exports = {
   register,
   login,
   forgotPassword,
   getAllUsers,
   resetPassword,
+  updateUser,
+  searchUsers
 }

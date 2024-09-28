@@ -1,4 +1,4 @@
-// require("dotenv").config();
+require("dotenv").config();
 //when you are in deveopement mode try to uncommend the above line 
 //and when you are in production mode try to comment the above line
 
@@ -136,7 +136,7 @@ app.use('/api/auth', require('./routes/AuthRouter.js'));
 //app.use('/api/job', require('./middleware/authentication.js'), require('./routes/JobRouter.js'))
 app.use('/api/job', require('./routes/JobRouter.js'))
 app.use('/api/oauth', require('./routes/StripeConnect.js'));
-
+app.use('/api/query', require('./routes/QueryRouter.js'));
 app.use('/api/stripe', require('./routes/StripeCheckoutRouter.js'));
 
 app.use(require('./middleware/not-found.js'));
