@@ -7,21 +7,36 @@ const jobSchema = new Schema({
     ref: 'User',
     required: true,
   },
-  ShovelerInfo: {
-    ShovelerId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: false,
+  ShovelerInfo: [
+    {
+      ShovelerId: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        required: false,
+      },
+      // acceptedAt: {
+      //   type: Number, // Unix timestamp (in milliseconds)
+      //   required: false,
+      // },
+      // isShovellerAccepted: {
+      //   type: Boolean,
+      //   required: false,
+      // },
+      shovellerAction:{
+        type: String,
+        enum: ['canceled', 'accepted', 'pending'],  // More flexible than Boolean
+        default: 'pending',  // Start with 'pending'
+        required:false,
+      },
+      houseOwnerAction: {
+        type: String,
+        enum: ['canceled', 'accepted', 'pending'],  // More flexible than Boolean
+        default: 'pending',  // Start with 'pending'
+        required:false,
+      },
     },
-    acceptedAt: { 
-      type: Number,  // Unix timestamp (in milliseconds)
-      required: false,
-    },
-    isShovellerAccepted:{
-      type: Boolean,
-      required:false
-    },
-  },
+  ],
+
   services: {
     type: [String],  // Array of services (strings)
     required: true,
@@ -65,10 +80,10 @@ const jobSchema = new Schema({
   paymentIntentId: { // Add a new field to store the paymentIntentId
     type: String
   },
-  isHouseOwnerAccepted:{
-    type: Boolean,
-    default:false
-  },
+  // isHouseOwnerAccepted:{
+  //   type: Boolean,
+  //   default:false
+  // },
   jobRating: {
     type: Number,
     min: 1,
