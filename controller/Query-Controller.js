@@ -54,15 +54,11 @@ const updateQuery = async (req, res, next) => {
     const { response: adminResponse, status } = req.body;
   
     try {
-      const newResponse = {
-        response: adminResponse,
-        timestamp: Date.now(),
-      };
   
       const updatedQuery = await Query.findOneAndUpdate(
         { _id: queryId },
         { 
-          $push: { response: newResponse }, // Push new response to response array
+          $push: { response: adminResponse }, // Push new response to response array
           status: status || 'in-progress', 
         },
         { new: true, runValidators: true }

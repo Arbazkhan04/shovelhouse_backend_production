@@ -1,22 +1,14 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const responseSchema = new mongoose.Schema({
-    response: {
-        type: String,
-        required: true,
-    },
-    timestamp: {
-        type: Number,
-        required: true,
-        default: Date.now()
-    }
-})
-
 const querySchema = new mongoose.Schema({
     userId: {
         type: Schema.Types.ObjectId,
         ref: 'User',
+        required: true,
+    },
+    title: {
+        type: String,
         required: true,
     },
     query: {
@@ -24,7 +16,7 @@ const querySchema = new mongoose.Schema({
         required: true,
     },
     response : {
-        type: [responseSchema],
+        type: [String],
         required: false,
     },
     status: {
