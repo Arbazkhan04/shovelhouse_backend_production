@@ -19,7 +19,62 @@ const app = express();
 const server = http.createServer(app);
 
 
-// webhoool for stripe
+// webhoool for stripe related to connect accounts
+app.post('/webhook/connectaccounts', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
+    console.log('Received Stripe event:');
+    const sig = req.headers['stripe-signature'];
+    const endpointSecret = 'whsec_fG9eAhEmVkSI8EsTfz0f2QaHH76DuYnj';
+
+    let event;
+
+    try {
+        event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    } catch (err) {
+        console.error(`Webhook error: ${err.message}`);
+        return res.status(400).send(`Webhook error: ${err.message}`);
+    }
+
+    if (event.type === 'account.updated') {
+        console.log('Account updated event received:', event.data.object);
+        const account = event.data.object;
+        const stripeAccountId = account.id; // Get the Stripe account ID
+        const chargesEnabled = account.charges_enabled;
+
+        let reason = 'no reason detected';
+        if (!chargesEnabled) {
+            if (account.verification && account.verification.disabled_reason) {
+                reason = `Charges are disabled due to verification issues: ${account.verification.disabled_reason}`;
+            } else if (account.capabilities && account.capabilities.card_payments && account.capabilities.card_payments.state === 'inactive') {
+                reason = 'Charges are disabled because card payments capability is inactive.';
+            } else if (account.capabilities && account.capabilities.transfers && account.capabilities.transfers.state === 'inactive') {
+                reason = 'Charges are disabled because transfers capability is inactive.';
+            }
+        }
+
+        try {
+            // Update the Shoveller's status in your database
+            await User.updateOne(
+                { stripeAccountId },
+                {
+                    stripeAccountStatus: chargesEnabled ? 'enabled' : 'restricted',
+                    chargesEnabled,
+                    reason
+                }
+            );
+            console.log('Account status updated for Stripe Account ID:', stripeAccountId);
+        } catch (error) {
+            console.error('Error updating user status:', error);
+        }
+
+        // Respond with a success message
+        res.json({ success: chargesEnabled, message: reason });
+    }
+
+    res.json({ received: true });
+})
+
+
+// webhoool for stripe related to payment
 app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
     console.log('Received Stripe event:');
     const sig = req.headers['stripe-signature'];
@@ -73,41 +128,41 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
     }
 
 
-    if (event.type === 'account.updated') {
-        console.log('Account updated event received:', event.data.object);
-        const account = event.data.object;
-        const stripeAccountId = account.id; // Get the Stripe account ID
-        const chargesEnabled = account.charges_enabled;
+    // if (event.type === 'account.updated') {
+    //     console.log('Account updated event received:', event.data.object);
+    //     const account = event.data.object;
+    //     const stripeAccountId = account.id; // Get the Stripe account ID
+    //     const chargesEnabled = account.charges_enabled;
 
-        let reason = 'no reason detected';
-        if (!chargesEnabled) {
-            if (account.verification && account.verification.disabled_reason) {
-                reason = `Charges are disabled due to verification issues: ${account.verification.disabled_reason}`;
-            } else if (account.capabilities && account.capabilities.card_payments && account.capabilities.card_payments.state === 'inactive') {
-                reason = 'Charges are disabled because card payments capability is inactive.';
-            } else if (account.capabilities && account.capabilities.transfers && account.capabilities.transfers.state === 'inactive') {
-                reason = 'Charges are disabled because transfers capability is inactive.';
-            }
-        }
+    //     let reason = 'no reason detected';
+    //     if (!chargesEnabled) {
+    //         if (account.verification && account.verification.disabled_reason) {
+    //             reason = `Charges are disabled due to verification issues: ${account.verification.disabled_reason}`;
+    //         } else if (account.capabilities && account.capabilities.card_payments && account.capabilities.card_payments.state === 'inactive') {
+    //             reason = 'Charges are disabled because card payments capability is inactive.';
+    //         } else if (account.capabilities && account.capabilities.transfers && account.capabilities.transfers.state === 'inactive') {
+    //             reason = 'Charges are disabled because transfers capability is inactive.';
+    //         }
+    //     }
 
-        try {
-            // Update the Shoveller's status in your database
-            await User.updateOne(
-                { stripeAccountId },
-                {
-                    stripeAccountStatus: chargesEnabled ? 'enabled' : 'restricted',
-                    chargesEnabled,
-                    reason
-                }
-            );
-            console.log('Account status updated for Stripe Account ID:', stripeAccountId);
-        } catch (error) {
-            console.error('Error updating user status:', error);
-        }
+    //     try {
+    //         // Update the Shoveller's status in your database
+    //         await User.updateOne(
+    //             { stripeAccountId },
+    //             {
+    //                 stripeAccountStatus: chargesEnabled ? 'enabled' : 'restricted',
+    //                 chargesEnabled,
+    //                 reason
+    //             }
+    //         );
+    //         console.log('Account status updated for Stripe Account ID:', stripeAccountId);
+    //     } catch (error) {
+    //         console.error('Error updating user status:', error);
+    //     }
 
-        // Respond with a success message
-        res.json({ success: chargesEnabled, message: reason });
-    }
+    //     // Respond with a success message
+    //     res.json({ success: chargesEnabled, message: reason });
+    // }
 
 
     res.json({ received: true });
