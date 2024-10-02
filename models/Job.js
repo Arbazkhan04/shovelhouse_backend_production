@@ -24,13 +24,13 @@ const jobSchema = new Schema({
       // },
       shovellerAction:{
         type: String,
-        enum: ['canceled', 'accepted', 'pending'],  // More flexible than Boolean
+        enum: ['canceled', 'accepted', 'pending','completed','uncompleted'],  // More flexible than Boolean the uncompleted action will be form admin
         default: 'pending',  // Start with 'pending'
         required:false,
       },
       houseOwnerAction: {
         type: String,
-        enum: ['canceled', 'accepted', 'pending'],  // More flexible than Boolean
+        enum: ['canceled', 'accepted', 'pending','completed'],  // More flexible than Boolean
         default: 'pending',  // Start with 'pending'
         required:false,
       },

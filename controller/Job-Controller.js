@@ -2,6 +2,7 @@ const Job = require('../models/Job');
 const User = require('../models/User');
 const { BadRequestError, NotFoundError } = require('../errors/index');
 const { StatusCodes } = require('http-status-codes')
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 
 const getAllJobs = async (req, res) => {
@@ -16,7 +17,7 @@ const getAllJobs = async (req, res) => {
 
 const updateJobStatusForShovellerAcceptedJob = async (req, res) => {
   try {
-    const { jobId, shovellerId,decision } = req.body;
+    const { jobId, shovellerId, decision } = req.body;
 
     // Check if jobId and shovellerId are provided
     if (!jobId || !shovellerId || typeof decision !== 'boolean') {
@@ -76,11 +77,11 @@ const getListOfShovellerWhoAppliedOnJobs = async (req, res) => {
 
     if (!shovellers || shovellers.length === 0) {
       return res.status(200).json([]); // Send empty array
-      }
-    
+    }
+
     // Get all shovellers from User schema who applied on this job
-    const shovellersList = await User.find({ 
-      _id: { $in: shovellers.map((shoveller) => shoveller.ShovelerId) } 
+    const shovellersList = await User.find({
+      _id: { $in: shovellers.map((shoveller) => shoveller.ShovelerId) }
     }).select('_id userName'); // Only select _id and userName
 
     // Combine the shoveller info from User with houseOwnerAction and scheduledTime from job
@@ -109,7 +110,7 @@ const getJobsInWhichShovllerApplied = async (req, res) => {
     const { shovellerId } = req.params;
     const jobs = await Job.find({ 'ShovelerInfo.ShovelerId': shovellerId });
     return res.status(200).json({ jobs });
-  }catch(error){
+  } catch (error) {
     return res.status(500).json({ message: "Error getting the list of jobs" });
   }
 }
@@ -154,7 +155,7 @@ const createJob = async (req, res) => {
 
 const updateHouseOwnerDecision = async (req, res) => {
   try {
-    
+
     const { jobId, shovellerId, decision } = req.body; // 'decision' will be true (accept) or false (reject)
     console.log(jobId, shovellerId, decision)
 
@@ -204,12 +205,164 @@ const updateHouseOwnerDecision = async (req, res) => {
       },
       token,
     });
-    
+
   } catch (error) {
     console.log(error);
     return res.status(500).json({ message: "Error updating the job" });
   }
 };
+
+
+// Mark the job as completed by shoveller or houseOwner
+const markJobAsCompleted = async (req, res) => {
+  const { jobId, shovellerId, role } = req.body;
+
+  try {
+    let updateAction = {};
+
+    // Check if the role is 'shoveller'
+    if (role === 'shoveller') {
+      updateAction = {
+        $set: {
+          'ShovelerInfo.$.shovellerAction': 'completed',
+        },
+      };
+    } else if (role === 'houseOwner') {
+      // Check if the role is 'houseOwner'
+      updateAction = {
+        $set: {
+          'ShovelerInfo.$.houseOwnerAction': 'completed',
+          jobStatus: 'completed', // Update job status when houseOwner marks the job as completed
+        },
+      };
+    } else {
+      return res.status(400).json({ message: "Invalid role" });
+    }
+
+    // Find and update the specific shoveller's action
+    const job = await Job.findOneAndUpdate(
+      {
+        _id: jobId,
+        'ShovelerInfo.ShovelerId': shovellerId,  // Match based on shoveller's ID
+      },
+      updateAction,
+      { new: true }
+    );
+
+    if (!job) {
+      return res.status(404).json({ message: "Job or shoveller not found" });
+    }
+
+    // If houseOwner marks the job as completed
+    if (role === 'houseOwner') {
+      // Capture the payment
+      const paymentIntent = await stripe.paymentIntents.capture(job.paymentIntentId);
+      console.log('Payment captured:', paymentIntent);  // Log the payment intent
+
+      // Update the payment status to 'capture'
+      await Job.findByIdAndUpdate(jobId, { 'paymentInfo.status': 'capture' }, { new: true });
+
+      // Retrieve the shoveller's Stripe account ID from the User model
+      const shoveller = await User.findById(shovellerId);
+      if (!shoveller || !shoveller.stripeAccountId) {
+        return res.status(404).json({ message: "Shoveller's Stripe account not found" });
+      }
+
+      // Transfer the payout to the shoveller
+      const payout = await stripe.transfers.create({
+        amount: job.paymentInfo.amount, // Make sure the amount is in the smallest currency unit (e.g., cents)
+        currency: 'usd',
+        destination: shoveller.stripeAccountId, // Use the stripeAccountId from User model
+      });
+
+      console.log('Payout:', payout);  // Log the payout
+    }
+
+    // Return the updated job
+    return res.status(200).json({ message: `${role} action updated`, job });
+
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Error updating the job" });
+  }
+};
+
+
+
+//cancel job for houseonwer and return his payment back 
+const cancelJob = async (req, res) => {
+  const { jobId, shovellerId } = req.body;
+  const job = await Job.findById(jobId);
+  if (!job) {
+    return res.status(200).json({ err: "Job not found" });
+  }
+  // Check if the job is already completed by shoveller
+  const shoveller = job.ShovelerInfo.find(s => s.ShovelerId.toString() === shovellerId);
+  if (!shoveller) {
+    return res.status(200).json({ err: "Shoveller not found" });
+  }
+  if (shoveller.shovellerAction === 'completed') {
+    return res.status(200).json({ err: "Shoveller already marked this job as completed if you need assisitance support you can react out to us" });
+
+  } else {
+    //update the job status to canceled
+    const updatedJob = await Job.findByIdAndUpdate(jobId, { jobStatus: 'canceled' }, { new: true });
+    //update the shoveller action to canceled
+    const updatedShoveller = await Job.findOneAndUpdate(
+      {
+        _id: jobId,
+        'ShovelerInfo.ShovelerId': shovellerId,  // Match based on shoveller's ID
+      },
+      {
+        $set: {
+          'ShovelerInfo.$.shovellerAction': 'canceled',
+        },
+      },
+      { new: true }
+    );
+
+    //return his payent back as well latar on we will implement the payment gateway
+    //return the updated job
+    return res.status(200).json({ message: "Job canceled successfully", job: updatedJob });
+  }
+
+}
+
+//revert the job into progress again if the houseonwe is not able to cancle the job and he requested for cancel
+const markedJobAsUnCompleted = async (req, res) => {
+  try {
+    const { jobId, shovellerId } = req.body;
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(200).json({ err: "Job not found" });
+    }
+    // Check if the job is already completed by shoveller
+    const shoveller = job.ShovelerInfo.find(s => s.ShovelerId.toString() === shovellerId);
+    if (!shoveller) {
+      return res.status(200).json({ err: "Shoveller not found" });
+    }
+    // set the status to uncompleted for the shveoller
+    const updatedShoveller = await Job.findOneAndUpdate(
+      {
+        _id: jobId,
+        'ShovelerInfo.ShovelerId': shovellerId,  // Match based on shoveller's ID
+      },
+      {
+        $set: {
+          'ShovelerInfo.$.shovellerAction': 'uncompleted',
+        },
+      },
+      { new: true }
+    );
+
+    //return the updated job
+    return res.status(200).json({ message: "Job status updated to un-completed", job: updatedShoveller });
+  } catch (error) {
+    console.log(error);
+    return res.status(200).json({ message: "Error updating the job" });
+  }
+
+}
 
 
 
@@ -337,5 +490,8 @@ module.exports = {
   updateJobStatusForShovellerAcceptedJob,
   updateHouseOwnerDecision,
   getListOfShovellerWhoAppliedOnJobs,
-  getJobsInWhichShovllerApplied
+  getJobsInWhichShovllerApplied,
+  markJobAsCompleted,
+  cancelJob,
+  markedJobAsUnCompleted,
 }
