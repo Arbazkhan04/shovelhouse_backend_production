@@ -39,6 +39,11 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: function() { return this.userRole !== 'admin'; },  // Required for shoveller and houseOwner
   },
+  status: {
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active'
+  },
   neighborhood: {
     type: String,
     required: function() { return this.userRole === 'shoveller'; },  // Required only for shovellers
@@ -117,7 +122,6 @@ UserSchema.methods.getResetPasswordToken = function () {
 
   return resetToken
 }
-
 
 
 module.exports = mongoose.model('User', UserSchema)
