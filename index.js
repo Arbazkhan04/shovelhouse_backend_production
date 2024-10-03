@@ -34,6 +34,7 @@ app.post('/webhook/connectaccounts', bodyParser.raw({ type: 'application/json' }
         return res.status(400).send(`Webhook error: ${err.message}`);
     }
 
+    // Handle account.updated event
     if (event.type === 'account.updated') {
         console.log('Account updated event received:', event.data.object);
         const account = event.data.object;
@@ -64,14 +65,97 @@ app.post('/webhook/connectaccounts', bodyParser.raw({ type: 'application/json' }
             console.log('Account status updated for Stripe Account ID:', stripeAccountId);
         } catch (error) {
             console.error('Error updating user status:', error);
+            return res.status(500).send('Database update error');
         }
 
-        // Respond with a success message
-        res.json({ success: chargesEnabled, message: reason });
+        return res.json({ success: chargesEnabled, message: reason });
     }
 
-    res.json({ received: true });
-})
+    // Handle payout events
+    if (['payout.created', 'payout.paid', 'payout.failed', 'payout.updated'].includes(event.type)) {
+        const payout = event.data.object;
+        const payoutId = payout.id;
+
+        // Determine the payout status
+        let payoutStatus;
+        switch (event.type) {
+            case 'payout.created':
+                payoutStatus = 'created';
+                break;
+            case 'payout.paid':
+                payoutStatus = 'paid';
+                break;
+            case 'payout.failed':
+                payoutStatus = 'failed';
+                break;
+            case 'payout.updated':
+                payoutStatus = 'updated';
+                break;
+            default:
+                payoutStatus = 'unknown';
+        }
+
+        try {
+            // Step 1: List balance transactions for this payout
+            const balanceTransactions = await stripe.balanceTransactions.list({
+                payout: payoutId,
+                type: 'charge',
+                expand: ['data.source'],  // Expanding the source to get detailed charge information
+            });
+
+            // Step 2: Map the charges to retrieve the session ID
+            const charges = balanceTransactions.data.map((txn) => txn.source);  // Charges associated with the balance transactions
+
+            for (const charge of charges) {
+                // Step 3: Retrieve session information for each charge
+                const sessions = await stripe.checkout.sessions.list({
+                    payment_intent: charge.payment_intent,  // Use the payment_intent from the charge object
+                });
+
+                // Assuming there's only one session, retrieve the session ID
+                if (sessions.data.length > 0) {
+                    const session = sessions.data[0];  // Get the first session
+                    const sessionId = session.id;
+
+                    // Step 4: Update the relevant job in your database using the session ID
+                    const job = await Job.findOne({ stripeSessionId: sessionId });
+
+                    if (!job) {
+                        console.error('Job not found for session ID:', sessionId);
+                        continue; // Move on to the next charge if job not found
+                    }
+
+                    // Step 5: Find the shoveller where houseOwnerAction is marked as 'completed'
+                    const shovellerIndex = job.ShovelerInfo.findIndex(
+                        (info) => info.houseOwnerAction === 'completed'
+                    );
+
+                    if (shovellerIndex === -1) {
+                        console.error('No shoveller found with houseOwnerAction marked as completed');
+                        continue; // Move on to the next charge if no shoveller found
+                    }
+
+                    // Step 6: Update the payout status for the identified shoveller
+                    job.ShovelerInfo[shovellerIndex].PayoutStatus = payoutStatus;
+
+                    // Step 7: Save the updated job
+                    await job.save();
+                    console.log(`Payout status updated to ${payoutStatus} for session ID: ${sessionId}`);
+                } else {
+                    console.log('No session found for charge:', charge.id);
+                }
+            }
+
+            return res.status(200).send('Webhook handled successfully');
+        } catch (error) {
+            console.log(`Error processing payout event:`, error);
+            return res.status(500).send(`Error processing payout event`);
+        }
+    }
+
+    // If no event is handled
+    res.status(200).send(`Unhandled event type ${event.type}`);
+});
 
 
 // webhoool for stripe related to payment
@@ -105,7 +189,7 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
             );
             console.log('Payment status updated to authorized for session:', session.id);
         } catch (error) {
-            console.error('Error updating payment status:', error);
+            console.log('Error updating payment status:', error);
         }
     }
 
@@ -123,7 +207,7 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
                 console.log(`Payment intent ${paymentIntent.id} was canceled.`);
             }
         } catch (error) {
-            console.error('Error handling payment_intent.canceled:', error);
+            console.log('Error handling payment_intent.canceled:', error);
         }
     }
 
@@ -175,7 +259,7 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
 
 // middlewares
 app.use(cors({
-    origin: ['https://shovel-house.vercel.app', 'https://shovel-house-b93eaebaf538.herokuapp.com','http://localhost:3000'],
+    origin: ['https://shovel-house.vercel.app', 'https://shovel-house-b93eaebaf538.herokuapp.com', 'http://localhost:3000'],
     methods: ['GET', 'POST', 'PATCH'], // Adjust methods as needed
 }));
 app.use(express.json());
