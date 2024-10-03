@@ -34,6 +34,11 @@ const jobSchema = new Schema({
         default: 'pending',  // Start with 'pending'
         required:false,
       },
+      PayoutStatus:{
+        type:String,
+        enum:['paid','failed','created'],
+        required:false
+      }
     },
   ],
 
