@@ -268,14 +268,67 @@ const markJobAsCompleted = async (req, res) => {
         return res.status(404).json({ message: "Shoveller's Stripe account not found" });
       }
 
-      // Transfer the payout to the shoveller
-      const payout = await stripe.transfers.create({
-        amount: job.paymentInfo.amount, // Make sure the amount is in the smallest currency unit (e.g., cents)
-        currency: 'usd',
-        destination: shoveller.stripeAccountId, // Use the stripeAccountId from User model
-      });
+      const totalAmount = job.paymentInfo.amount; // 30 USD (amount you stored)
+      const platformFee = 0.20 * totalAmount; // 20% platform charge
+      const amountForShoveller = totalAmount - platformFee; // Amount to be sent to the shoveller
+  
+      // // Transfer the payout to the shoveller in CAD
+      // const payout = await stripe.transfers.create({
+      //   amount: Math.round(amountForShoveller), // amount in cents (e.g., 2400 for 24.00 USD)
+      //   currency: 'cad', // Set the currency to CAD for the shoveller
+      //   destination: shoveller.stripeAccountId, // Use the shoveller's Stripe account ID
+      // });
 
-      console.log('Payout:', payout);  // Log the payout
+      
+
+
+      // // if there is payout update the status of the job
+      // if(payout){
+      //   await Job.findByIdAndUpdate(jobId, { 'paymentInfo.payout': 'completed' }, { new: true });
+      // }
+
+      // console.log('Payout:', payout);  // Log the payout
+
+      try {
+        // Transfer the payout to the shoveller in CAD
+        const payout = await stripe.transfers.create({
+          amount: Math.round(amountForShoveller), // amount in cents
+          currency: 'cad', // Set the currency to CAD for the shoveller
+          destination: shoveller.stripeAccountId, // Use the shoveller's Stripe account ID
+        });
+      
+        // If the transfer is successful, update the job status
+        await Job.findOneAndUpdate(
+          {
+            _id: jobId,
+            'ShovelerInfo.ShovelerId': shovellerId  // Match based on the Shoveller's ID
+          },
+          {
+            $set: {
+              'ShovelerInfo.$.PayoutStatus': 'paid'  // Update the payout status for the matched shoveller
+            }
+          },
+          { new: true }
+        );        
+        console.log('Payout successful:', payout);
+      
+      } catch (error) {
+        await Job.findOneAndUpdate(
+          {
+            _id: jobId,
+            'ShovelerInfo.ShovelerId': shovellerId  // Match based on the Shoveller's ID
+          },
+          {
+            $set: {
+              'ShovelerInfo.$.PayoutStatus': 'failed'  // Update the payout status for the matched shoveller
+            }
+          },
+          { new: true }
+        );
+        
+        console.error('Error transferring to shoveller:', error.message);
+      }
+      
     }
 
     // Return the updated job

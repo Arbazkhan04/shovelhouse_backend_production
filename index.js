@@ -71,88 +71,6 @@ app.post('/webhook/connectaccounts', bodyParser.raw({ type: 'application/json' }
         return res.json({ success: chargesEnabled, message: reason });
     }
 
-    // Handle payout events
-    if (['payout.created', 'payout.paid', 'payout.failed', 'payout.updated'].includes(event.type)) {
-        const payout = event.data.object;
-        const payoutId = payout.id;
-
-        // Determine the payout status
-        let payoutStatus;
-        switch (event.type) {
-            case 'payout.created':
-                payoutStatus = 'created';
-                break;
-            case 'payout.paid':
-                payoutStatus = 'paid';
-                break;
-            case 'payout.failed':
-                payoutStatus = 'failed';
-                break;
-            case 'payout.updated':
-                payoutStatus = 'updated';
-                break;
-            default:
-                payoutStatus = 'unknown';
-        }
-
-        try {
-            // Step 1: List balance transactions for this payout
-            const balanceTransactions = await stripe.balanceTransactions.list({
-                payout: payoutId,
-                type: 'charge',
-                expand: ['data.source'],  // Expanding the source to get detailed charge information
-            });
-
-            // Step 2: Map the charges to retrieve the session ID
-            const charges = balanceTransactions.data.map((txn) => txn.source);  // Charges associated with the balance transactions
-
-            for (const charge of charges) {
-                // Step 3: Retrieve session information for each charge
-                const sessions = await stripe.checkout.sessions.list({
-                    payment_intent: charge.payment_intent,  // Use the payment_intent from the charge object
-                });
-
-                // Assuming there's only one session, retrieve the session ID
-                if (sessions.data.length > 0) {
-                    const session = sessions.data[0];  // Get the first session
-                    const sessionId = session.id;
-
-                    // Step 4: Update the relevant job in your database using the session ID
-                    const job = await Job.findOne({ stripeSessionId: sessionId });
-
-                    if (!job) {
-                        console.error('Job not found for session ID:', sessionId);
-                        continue; // Move on to the next charge if job not found
-                    }
-
-                    // Step 5: Find the shoveller where houseOwnerAction is marked as 'completed'
-                    const shovellerIndex = job.ShovelerInfo.findIndex(
-                        (info) => info.houseOwnerAction === 'completed'
-                    );
-
-                    if (shovellerIndex === -1) {
-                        console.error('No shoveller found with houseOwnerAction marked as completed');
-                        continue; // Move on to the next charge if no shoveller found
-                    }
-
-                    // Step 6: Update the payout status for the identified shoveller
-                    job.ShovelerInfo[shovellerIndex].PayoutStatus = payoutStatus;
-
-                    // Step 7: Save the updated job
-                    await job.save();
-                    console.log(`Payout status updated to ${payoutStatus} for session ID: ${sessionId}`);
-                } else {
-                    console.log('No session found for charge:', charge.id);
-                }
-            }
-
-            return res.status(200).send('Webhook handled successfully');
-        } catch (error) {
-            console.log(`Error processing payout event:`, error);
-            return res.status(500).send(`Error processing payout event`);
-        }
-    }
-
     // If no event is handled
     res.status(200).send(`Unhandled event type ${event.type}`);
 });
@@ -212,43 +130,6 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
     }
 
 
-    // if (event.type === 'account.updated') {
-    //     console.log('Account updated event received:', event.data.object);
-    //     const account = event.data.object;
-    //     const stripeAccountId = account.id; // Get the Stripe account ID
-    //     const chargesEnabled = account.charges_enabled;
-
-    //     let reason = 'no reason detected';
-    //     if (!chargesEnabled) {
-    //         if (account.verification && account.verification.disabled_reason) {
-    //             reason = `Charges are disabled due to verification issues: ${account.verification.disabled_reason}`;
-    //         } else if (account.capabilities && account.capabilities.card_payments && account.capabilities.card_payments.state === 'inactive') {
-    //             reason = 'Charges are disabled because card payments capability is inactive.';
-    //         } else if (account.capabilities && account.capabilities.transfers && account.capabilities.transfers.state === 'inactive') {
-    //             reason = 'Charges are disabled because transfers capability is inactive.';
-    //         }
-    //     }
-
-    //     try {
-    //         // Update the Shoveller's status in your database
-    //         await User.updateOne(
-    //             { stripeAccountId },
-    //             {
-    //                 stripeAccountStatus: chargesEnabled ? 'enabled' : 'restricted',
-    //                 chargesEnabled,
-    //                 reason
-    //             }
-    //         );
-    //         console.log('Account status updated for Stripe Account ID:', stripeAccountId);
-    //     } catch (error) {
-    //         console.error('Error updating user status:', error);
-    //     }
-
-    //     // Respond with a success message
-    //     res.json({ success: chargesEnabled, message: reason });
-    // }
-
-
     res.json({ received: true });
 });
 
@@ -267,6 +148,39 @@ app.use(express.urlencoded({ extended: true }));
 // app.use(cookiesParser())
 
 
+// ---------------------- this is test card endpoint ----------------------
+const createChargeToAddFunds = async (req, res) => {
+    try {
+        const charge = await stripe.charges.create({
+            amount: 1099,
+            currency: 'usd',
+            source: 'tok_bypassPending', // Bypasses the pending balance step in test mode
+          });
+      console.log('Funds added to balance:', charge);
+      return res.status(200).json({ message: 'Funds added to balance', charge });
+    } catch (error) {
+      console.log('Error adding funds:', error);
+      return res.status(500).json({ message: 'Error adding funds', error });
+    }
+  };
+
+
+  const reterieveBalance = async (req, res) => {
+    try {
+      const balance = await stripe.balance.retrieve();
+      console.log('Balance retrieved:', balance);
+      return res.status(200).json({ message: 'Balance retrieved', balance });
+    } catch (error) {
+      console.log('Error retrieving balance:', error);
+      return res.status(500).json({ message: 'Error retrieving balance', error });
+    }
+  }
+
+    app.get('/retrieve-balance', reterieveBalance);
+  
+  // Add funds route
+  app.post('/add-funds', createChargeToAddFunds);
+// ---------------------- this is test card endpoint ----------------------
 
 
 // route
@@ -280,6 +194,10 @@ app.use('/api/stripe', require('./routes/StripeCheckoutRouter.js'));
 
 app.use(require('./middleware/not-found.js'));
 app.use(require('./middleware/error-handler.js'));
+
+
+
+
 
 
 // Socket.IO setup
