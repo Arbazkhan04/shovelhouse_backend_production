@@ -186,12 +186,11 @@ const register = async (req, res) => {
           token,
         });
       } else {
-        res.status(400).json({ error: "Invalid user role" });
+        res.status(200).json({ error: "Invalid user role" });
       }
     } catch (err) {
-      console.log("Error during user registration:", err);
       res
-        .status(400)
+        .status(200)
         .json({ error: "Invalid User Data", message: err.message });
     }
   });
@@ -409,6 +408,95 @@ const searchUsers = async (req, res, next) => {
   }
 };
 
+const makeUserInactive = async (req, res, next) => {
+  try {
+    const { id: userId } = req.params;
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { status: 'inactive' },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+    if (!user) {
+      throw new BadRequestError("No user found with this ID");
+    }
+    res.status(StatusCodes.OK).json({ user });
+  }
+  catch (err) {
+    next(err);
+  }
+}
+
+const get_Shovelers_With_Probation_Completed = async (req, res, next) => {
+  try {
+    const users = await User.find({ probation: false, jobCount : { $gte: 10 } });
+    if (!users) {
+      throw new BadRequestError("No users found");
+    }
+    res.status(StatusCodes.OK).json({ users });
+  } catch (error) {
+    next(error);
+  }
+}
+
+const mark_Shoveler_Probation = async (req, res, next) => {
+  try {
+    const { id: userId } = req.params;
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { probation: true },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+    if (!user) {
+      throw new BadRequestError("No user found with this ID");
+    }
+    res.status(StatusCodes.OK).json({ user });
+  }
+  catch (err) {
+    next(err);
+  }
+}
+
+const get_Shoveler_referral_code = async (req, res, next) => {
+  try {
+    const { id: userId } = req.params;
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new BadRequestError("No user found with this ID");
+    }
+    res.status(StatusCodes.OK).json({ referralCode: user.referralCode });
+  }
+  catch (err) {
+    next(err);
+  }
+}
+
+const get_shoveler_referral_by = async (req, res, next) => {
+  try {
+    const { id: userId } = req.params;
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new BadRequestError("No user found with this ID");
+    }
+    const referredBy = await User.findById(user.referredBy);
+    if (!referredBy) {
+      throw new BadRequestError("Some error occured");
+    }
+    res.status(StatusCodes.OK).json({ referredBy: referredBy });
+  }
+  catch (err) {
+    next(err);
+  }
+}
+
+
+
+
 module.exports = {
   register,
   login,
@@ -417,4 +505,9 @@ module.exports = {
   resetPassword,
   updateUser,
   searchUsers,
+  makeUserInactive,
+  get_Shovelers_With_Probation_Completed,
+  mark_Shoveler_Probation,
+  get_Shoveler_referral_code,
+  get_shoveler_referral_by
 };

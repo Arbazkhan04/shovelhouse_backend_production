@@ -4,7 +4,7 @@ const { UnauthenticatedError } = require('../errors');
 const auth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer')) {
-    throw new UnauthenticatedError('Authentication invalid');
+    res.json({ message: 'Access denied' });
   }
   const token = authHeader.split(' ')[1];
 
@@ -17,7 +17,7 @@ const auth = async (req, res, next) => {
     };
     next();
   } catch (error) {
-    throw new UnauthenticatedError('Authentication invalid');
+    next(error);
   }
 };
 
