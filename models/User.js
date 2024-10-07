@@ -3,6 +3,11 @@ const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const crypto = require('crypto')
 
+function generateReferralCode() {
+  const referralCode = Math.floor(100000 + Math.random() * 900000);
+  return referralCode.toString(); // Convert to string if needed
+}
+
 const UserSchema = new mongoose.Schema({
 
   userRole: {
@@ -41,7 +46,7 @@ const UserSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'inactive'],
+    enum: ['active', 'inactive', 'suspend'],
     default: 'active'
   },
   neighborhood: {
@@ -81,13 +86,61 @@ const UserSchema = new mongoose.Schema({
     required: function() { return this.userRole === 'shoveller'; }, // Required only for shovellers
     // default: "User haven't setup stripe yet" // Store the reason if charges are not enabled
   },
-
-
+  referralCode: {
+    type: String,
+    //required: function () { return this.userRole === 'shoveller'; }, // Required only for shovellers
+    unique: true,
+    default: null // Default to null to avoid "Path `referralCode` is required" error before generation
+  },
+  referredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: function () { return this.userRole === 'shoveller'; }, // Required only for shovellers
+    default: undefined //keep empty is not provided
+  },
+  probation: {
+    type: Boolean,
+    required: function() { return this.userRole === 'shoveller'; }, // Required only for shovellers
+    default: false
+  },
+  jobCount: {
+    type: Number,
+    required: function() { return this.userRole === 'shoveller'; }, // Required only for shovellers
+    default: 0
+  },
   //reset password
   resetPasswordToken: String,          // Token to be used for password reset
   resetPasswordExpire: Date,           // Expiration time for the token
 
 })
+
+
+// Pre-save hook for generating referral code if needed
+UserSchema.pre('save', async function (next) {
+  if (this.userRole === 'shoveller' && !this.referralCode) {
+    let uniqueCode = false;
+
+    // Generate and check uniqueness of referral code
+    while (!uniqueCode) {
+      const newCode = generateReferralCode();
+
+      // Check if the referral code already exists
+      const existingUser = await this.constructor.findOne({ referralCode: newCode });
+      if (!existingUser) {
+        this.referralCode = newCode;
+        uniqueCode = true;
+      }
+    }
+  }
+
+  // Hash password if modified
+  if (this.isModified('password')) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
+
+  next();
+});
 
 UserSchema.pre('save', async function () {
   if (!this.isModified('password')) return // Only hash if password field is modified

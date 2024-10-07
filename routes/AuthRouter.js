@@ -1,13 +1,26 @@
 const express = require('express')
 const router = express.Router()
-const { register, login, getAllUsers, resetPassword, forgotPassword, searchUsers, updateUser} = require('../controller/auth')
+const { register, login, getAllUsers, resetPassword, forgotPassword, searchUsers, updateUser, get_Shovelers_With_Probation_Completed
+    , makeUserInactive, mark_Shoveler_Probation, get_Shoveler_referral_code, get_shoveler_referral_by
+} = require('../controller/auth')
 const { auth, authorizeRoles } = require('../middleware/authentication')
 
 router.get('/', auth, authorizeRoles('admin'), getAllUsers)
+//router.get('/', getAllUsers)
+
 router.get('/searchUsers', auth, authorizeRoles('admin'), searchUsers)
+
+router.get('/get_Shoveler_referral_code/:id', get_Shoveler_referral_code)
+router.get('/get_Shovelers_With_Probation_Completed', auth, authorizeRoles('admin'), get_Shovelers_With_Probation_Completed)
+router.get('/get_shoveler_referral_by/:id', auth, authorizeRoles('admin'), get_shoveler_referral_by)
+router.patch('/mark_Shoveler_Probation/:id', auth, authorizeRoles('admin'), mark_Shoveler_Probation)
+
+router.patch('/makeUserInactive/:id', auth, authorizeRoles('admin'), makeUserInactive)
 router.patch('/updateUser/:id', auth, authorizeRoles('admin'), updateUser)
+
 router.post('/register', register)
 router.post('/login', login)
+
 router.post('/forgotPassword', forgotPassword)
 router.patch('/resetPassword/:resetToken', resetPassword)
 
