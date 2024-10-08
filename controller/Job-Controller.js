@@ -4,15 +4,22 @@ const { BadRequestError, NotFoundError } = require('../errors/index');
 const { StatusCodes } = require('http-status-codes')
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-
 const getAllJobs = async (req, res) => {
   try {
-    const jobs = await Job.find({}).sort('createdAt')
-    res.status(StatusCodes.OK).json({ jobs, count: jobs.length })
+    // Find all jobs with status 'open' and not 'in-progress', and populate house owner's name
+    const jobs = await Job.find({ })
+      .populate({
+        path: 'houseOwnerId',
+        select: 'name imageUrl', // Choose fields to return from the User schema
+      })
+      .sort('createdAt');
+
+    res.status(StatusCodes.OK).json({ jobs, count: jobs.length });
   } catch (error) {
-    throw new BadRequestError("invalid job data")
+    throw new BadRequestError('Invalid job data');
   }
-}
+};
+
 
 
 const updateJobStatusForShovellerAcceptedJob = async (req, res) => {
