@@ -266,8 +266,9 @@ const login = async (req, res, next) => {
       });
     }
   } catch (error) {
-    console.log(error);
-    next(error);
+    return res.status(200).json({ error: error.message });
+    // console.log(error);
+    // next(error);
   }
 };
 
