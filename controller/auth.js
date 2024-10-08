@@ -7,7 +7,7 @@ const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const { BadRequestError } = require("../errors");
 const sendEmail = require("../utlis/sendEmail.js");
 const crypto = require("crypto");
-import { UnauthenticatedError } from "../errors";
+const { UnauthenticatedError } = require("../errors");
 // Initialize S3Client with credentials and region
 const s3 = new S3Client({
   region: process.env.AWS_S3_REGION, // e.g., 'us-east-1'
@@ -205,7 +205,7 @@ const login = async (req, res, next) => {
     }
     const user = await User.findOne({ email });
     if (!user) {
-      throw new UnauthenticatedError("Invalid Credentials");
+      throw new UnauthenticatedError("Invalid Credential");
     }
     const isPasswordCorrect = await user.comparePassword(password);
     if (!isPasswordCorrect) {
