@@ -15,6 +15,14 @@ const UserSchema = new mongoose.Schema({
     enum: ['admin', 'shoveller', 'houseOwner'],
     required: true
   },
+  latitude: {
+    type: Number,
+    required: function () { return this.userRole === 'shoveller' },
+  },
+  longitude: {
+    type: Number,
+    required: function () { return this.userRole === 'shoveller' },
+  },
   userName: {
     type: String,
     required: function() { return this.userRole !== 'admin'; }  // Required for shoveller and houseOwner
@@ -49,11 +57,11 @@ const UserSchema = new mongoose.Schema({
     enum: ['active', 'inactive', 'suspend'],
     default: 'active'
   },
-  neighborhood: {
-    type: String,
-    required: function() { return this.userRole === 'shoveller'; },  // Required only for shovellers
-    default: undefined //keep empty is not provided
-  },
+  // neighborhood: {
+  //   type: String,
+  //   required: function() { return this.userRole === 'shoveller'; },  // Required only for shovellers
+  //   default: undefined //keep empty is not provided
+  // },
   servicesProvide: {
     type: [String],
     required: function() { return this.userRole === 'shoveller'; },  // Required only for shovellers
