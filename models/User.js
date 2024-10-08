@@ -103,7 +103,7 @@ const UserSchema = new mongoose.Schema({
   referredBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: function () { return this.userRole === 'shoveller'; }, // Required only for shovellers
+    // required: function () { return this.userRole === 'shoveller'; }, // Required only for shovellers
     default: null  //send none from frontend if not provided
   },
   probation: {
