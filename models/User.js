@@ -104,7 +104,7 @@ const UserSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: function () { return this.userRole === 'shoveller'; }, // Required only for shovellers
-    default: undefined //keep empty is not provided
+    default: null  //send none from frontend if not provided
   },
   probation: {
     type: Boolean,
