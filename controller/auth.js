@@ -251,6 +251,8 @@ const login = async (req, res, next) => {
           role: user.userRole,
           chargesEnabled: user.chargesEnabled,
           stripeAccountId: user.stripeAccountId,
+          latitude: user.latitude,
+          longitude: user.longitude,
         },
         token,
       });

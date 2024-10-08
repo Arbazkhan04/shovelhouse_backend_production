@@ -71,7 +71,7 @@ const StripeCallback = async (req, res) => {
                 });
             } else if (user.userRole === 'shoveller') {
                 res.status(StatusCodes.CREATED).json({ 
-                    user: { id: user._id, role: user.userRole, chargesEnabled: user.chargesEnabled, stripeAccountId: user.stripeAccountId }, 
+                    user: { id: user._id, role: user.userRole, chargesEnabled: user.chargesEnabled, stripeAccountId: user.stripeAccountId, latitude: user.latitude, longitude: user.longitude },   
                     token 
                 });
             } else if (user.userRole === 'admin') {
