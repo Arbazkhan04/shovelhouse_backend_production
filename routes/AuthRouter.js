@@ -1,21 +1,25 @@
 const express = require('express')
 const router = express.Router()
 const { register, login, getAllUsers, resetPassword, forgotPassword, searchUsers, updateUser, get_Shovelers_With_Probation_Completed
-    , makeUserInactive, mark_Shoveler_Probation, get_Shoveler_referral_code, get_shoveler_referral_by
+    , changeUserStatus, mark_Shoveler_Probation, get_Shoveler_referral_code, get_shoveler_referral_by,
+    getAllShovelersInfo
 } = require('../controller/auth')
+const { getAllJobsInfo } = require('../controller/Job-Controller');
 const { auth, authorizeRoles } = require('../middleware/authentication')
+
 
 router.get('/', auth, authorizeRoles('admin'), getAllUsers)
 //router.get('/', getAllUsers)
 
 router.get('/searchUsers', auth, authorizeRoles('admin'), searchUsers)
+router.get('/getAllShovelersInfo', auth, authorizeRoles('admin'), getAllShovelersInfo)
 
 router.get('/get_Shoveler_referral_code/:id', get_Shoveler_referral_code)
 router.get('/get_Shovelers_With_Probation_Completed', auth, authorizeRoles('admin'), get_Shovelers_With_Probation_Completed)
 router.get('/get_shoveler_referral_by/:id', auth, authorizeRoles('admin'), get_shoveler_referral_by)
 router.patch('/mark_Shoveler_Probation/:id', auth, authorizeRoles('admin'), mark_Shoveler_Probation)
 
-router.patch('/makeUserInactive/:id', auth, authorizeRoles('admin'), makeUserInactive)
+router.patch('/changeUserStatus/:id', auth, authorizeRoles('admin'), changeUserStatus)
 router.patch('/updateUser/:id', auth, authorizeRoles('admin'), updateUser)
 
 router.post('/register', register)
