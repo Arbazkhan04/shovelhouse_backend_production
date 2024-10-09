@@ -52,6 +52,10 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: function() { return this.userRole !== 'admin'; },  // Required for shoveller and houseOwner
   },
+  dateJoined: {
+    type: Date,
+    default: Date.now
+  },
   status: {
     type: String,
     enum: ['active', 'inactive', 'suspend'],

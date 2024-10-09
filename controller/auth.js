@@ -412,12 +412,13 @@ const searchUsers = async (req, res, next) => {
   }
 };
 
-const makeUserInactive = async (req, res, next) => {
+const changeUserStatus = async (req, res, next) => {
   try {
     const { id: userId } = req.params;
+    const { status } = req.body;
     const user = await User.findByIdAndUpdate(
       userId,
-      { status: 'inactive' },
+      { status: status },
       {
         new: true,
         runValidators: true,
@@ -432,6 +433,54 @@ const makeUserInactive = async (req, res, next) => {
     next(err);
   }
 }
+
+// this will be returning a json with {shovelerDetails, statistics}
+const getAllShovelersInfo = async (req, res, next) => {
+  try {
+    // Step 1: Fetch all shovelers from the User schema
+    const shovelers = await User.find({ userRole: 'shoveller' });
+    
+    if (!shovelers) {
+      throw new BadRequestError("No shovelers found");
+    }
+
+    // Step 2: Iterate over each shoveler and gather their statistics from the Job schema
+    const shovelerInfoPromises = shovelers.map(async (shoveler) => {
+      // Find all jobs where the shoveler was involved
+      const jobs = await Job.find({ "ShovelerInfo.ShovelerId": shoveler._id });
+
+      // Calculate job statistics
+      const totalJobs = jobs.length;
+      const completedJobs = jobs.filter(job => job.jobStatus === 'completed').length;
+      const canceledJobs = jobs.filter(job => job.ShovelerInfo.some(info => info.shovellerAction === 'canceled')).length;
+      const totalPayments = jobs.reduce((total, job) => job.jobStatus === 'completed' ? total + job.paymentInfo.amount: 0, 0);
+      const averagePrice = totalPayments / completedJobs;
+      const averageRating = jobs.reduce((total, job) => job.jobRating ? total + job.jobRating : total, 0) / completedJobs;
+
+      // Construct the response object for the current shoveler
+      return {
+        shovelerDetails: shoveler, // Complete shoveler schema details
+        statistics: {
+          totalJobs,
+          completedJobs,
+          canceledJobs,
+          totalPayments,
+          averagePrice,
+          averageRating
+        }
+      };
+    });
+
+    // Step 3: Wait for all the promises to resolve
+    const shovelersInfo = await Promise.all(shovelerInfoPromises);
+
+    // Step 4: Send the response
+    res.status(StatusCodes.OK).json({ shovelers: shovelersInfo });
+  } catch (err) {
+    next(err);
+  }
+};
+
 
 const get_Shovelers_With_Probation_Completed = async (req, res, next) => {
   try {
@@ -509,9 +558,10 @@ module.exports = {
   resetPassword,
   updateUser,
   searchUsers,
-  makeUserInactive,
+  changeUserStatus,
   get_Shovelers_With_Probation_Completed,
   mark_Shoveler_Probation,
   get_Shoveler_referral_code,
-  get_shoveler_referral_by
+  get_shoveler_referral_by,
+  getAllShovelersInfo
 };

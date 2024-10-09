@@ -541,6 +541,36 @@ const updateJob = async (req, res) => {
   }
 }
 
+const getAllJobsInfo = async (req, res, next) => {
+  try {
+    // Step 1: Fetch all jobs from the jobs schema
+    const jobs = await Job.find({ });
+    
+    if (!jobs) {
+      throw new BadRequestError("No jobs found");
+    }
+
+    // Step 2: Iterate over each job and gather their user info from the user schema
+    const jobInfoPromises = jobs.map(async (job) => {
+      const id = job.houseOwnerId
+      const user = await User.findById({ _id: id });
+      return {
+        jobDetails: job,
+        userDetails: user
+      }
+    });
+    
+
+    // Step 3: Wait for all the promises to resolve
+    const jobsInfo = await Promise.all(jobInfoPromises);
+
+    // Step 4: Send the response
+    res.status(StatusCodes.OK).json({ jobs: jobsInfo });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getAllJobs,
   createJob,
@@ -554,4 +584,5 @@ module.exports = {
   markJobAsCompleted,
   cancelJob,
   markedJobAsUnCompleted,
+  getAllJobsInfo
 }
