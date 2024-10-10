@@ -81,7 +81,7 @@ const register = async (req, res) => {
             imageUrl,
             referredBy: referredBy[0]._id,
           }
-           user = await User.create({ shoveller });
+           user = await User.create(shoveller);
         }
 
       }
