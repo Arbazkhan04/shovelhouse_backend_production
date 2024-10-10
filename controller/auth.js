@@ -172,7 +172,7 @@ const login = async (req, res, next) => {
           res.status(StatusCodes.CREATED).json({
             user: {
               jobId: job._id,
-              id: user._id,
+              houseOwnerId: user._id, //here return as houseonwner id
               role: user.userRole,
               paymentOffering: job.paymentInfo.amount,
               jobStatus: job.jobStatus,
