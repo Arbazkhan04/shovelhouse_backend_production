@@ -8,6 +8,7 @@ const { BadRequestError } = require("../errors");
 const sendEmail = require("../utlis/sendEmail.js");
 const crypto = require("crypto");
 const { UnauthenticatedError } = require("../errors");
+const mongoose = require('mongoose'); // Ensure mongoose is imported
 // Initialize S3Client with credentials and region
 const s3 = new S3Client({
   region: process.env.AWS_S3_REGION, // e.g., 'us-east-1'
@@ -79,7 +80,7 @@ const register = async (req, res) => {
             reason: req.body.reason,
             stripeAccountStatus: req.body.stripeAccountStatus,
             imageUrl,
-            referredBy: referredBy[0]._id,
+            referredBy: mongoose.Types.ObjectId(referredBy[0]._id),
           }
            user = await User.create(shoveller);
         }
