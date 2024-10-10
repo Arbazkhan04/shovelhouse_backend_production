@@ -56,7 +56,7 @@ const register = async (req, res) => {
 
       // Create the user in the database, including the imageUrl
       //check if user role is shvoeller and refferal code is valid
-      const user = {};
+      let user;
       if (req.body.userRole === "shoveller" && req.body.referredBy) {
         //check referral code is validrs
         const referredBy = await User.find({ referralCode: req.body.referredBy });
