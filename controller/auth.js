@@ -159,17 +159,44 @@ const login = async (req, res, next) => {
       //check houseowner job posted status
       if (isJobPostedByHouseOwner.length > 0) {
         const job = isJobPostedByHouseOwner[0]; // Access the first job in the array
-        res.status(StatusCodes.CREATED).json({
-          user: {
-            jobId: job._id,
-            id: user._id,
-            role: user.userRole,
-            paymentOffering: job.paymentInfo.amount,
-            jobStatus: job.jobStatus,
-            paymentStatus: job.paymentInfo.status,
-          },
-          token,
-        });
+        //check if job is in progress and send the shoveller id who is completing the jon
+        if(job.jobStatus === "in-progess"){
+          // find the job who is accepted by house owner
+          let shovellerId;
+          for(let i=0; i<job.ShovelerInfo.length; i++){
+            if(job.ShovelerInfo[i].shovellerAction === "accepted" && job.ShovelerInfo[i].houseOwnerAction === "accepted"){
+              shovellerId = job.ShovelerInfo[i].ShovelerId;
+              break;
+            }
+          }
+          res.status(StatusCodes.CREATED).json({
+            user: {
+              jobId: job._id,
+              id: user._id,
+              role: user.userRole,
+              paymentOffering: job.paymentInfo.amount,
+              jobStatus: job.jobStatus,
+              paymentStatus: job.paymentInfo.status,
+              shovellerId: shovellerId,
+            },
+            token,
+          });
+        }
+        //otherwise job is not in progess 
+        else{
+          res.status(StatusCodes.CREATED).json({
+            user: {
+              jobId: job._id,
+              id: user._id,
+              role: user.userRole,
+              paymentOffering: job.paymentInfo.amount,
+              jobStatus: job.jobStatus,
+              paymentStatus: job.paymentInfo.status,
+            },
+            token,
+          });
+        }
+        
       } else {
         res.status(StatusCodes.CREATED).json({
           user: {
