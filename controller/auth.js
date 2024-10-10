@@ -80,7 +80,7 @@ const register = async (req, res) => {
             reason: req.body.reason,
             stripeAccountStatus: req.body.stripeAccountStatus,
             imageUrl,
-            referredBy: mongoose.Types.ObjectId(referredBy[0]._id),
+            referredBy: new mongoose.Types.ObjectId(referredBy[0]._id),
           }
            user = await User.create(shoveller);
         }
