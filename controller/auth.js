@@ -160,7 +160,7 @@ const login = async (req, res, next) => {
       if (isJobPostedByHouseOwner.length > 0) {
         const job = isJobPostedByHouseOwner[0]; // Access the first job in the array
         //check if job is in progress and send the shoveller id who is completing the jon
-        if(job.jobStatus === "in-progess"){
+        if(job.jobStatus === "in-progress"){
           // find the job who is accepted by house owner
           let shovellerId;
           for(let i=0; i<job.ShovelerInfo.length; i++){
