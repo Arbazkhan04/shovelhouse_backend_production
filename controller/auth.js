@@ -22,104 +22,6 @@ const S3_BUCKET = process.env.S3_BUCKET_NAME;
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-// const register = async (req, res) => {
-//   upload.single('image')(req, res, async (err) => {
-//     if (err) {
-//       return res.status(500).json({ error: err.message });
-//     }
-
-//     try {
-
-//       const userId = uuidv4();
-//       const imageName = `${userId}.jpg`;
-//       let imageUrl;
-
-//       // Check if an image was uploaded
-//       if (req.body.image) {
-//         const base64Data = req.body.image.replace(/^data:image\/\w+;base64,/, "");
-//         const buffer = Buffer.from(base64Data, 'base64');
-
-//         const uploadParams = {
-//           Bucket: S3_BUCKET,
-//           Key: imageName,
-//           Body: buffer,
-//           ContentType: req.file ? req.file.mimetype : 'image/jpeg', // Fallback content type
-//         };
-
-//         const command = new PutObjectCommand(uploadParams);
-//         await s3.send(command);
-
-//         imageUrl = `https://${S3_BUCKET}.s3.amazonaws.com/${imageName}`;
-//       }
-
-//       // Create the user in the database, including the imageUrl
-//       const user = await User.create({ ...req.body, imageUrl });
-
-//       // Generate a JWT token
-//       const token = user.createJWT();
-
-//       // Send response based on user role
-//       if (user.userRole === 'houseOwner') {
-//         //search on job as well to get the job details
-//         const isJobPostedByHouseOwner = await Job.find({
-//           houseOwnerId: user._id,
-//           $or: [
-//               { jobStatus: 'open' },
-//               { jobStatus: 'in progress' }
-//           ]
-//       });
-
-//         //check houseowner job posted status
-//         if(isJobPostedByHouseOwner){
-//           res.status(StatusCodes.CREATED).json({
-//             user: {
-//               jobId: isJobPostedByHouseOwner._id,
-//               id: user._id,
-//               role: user.userRole,
-//               jobStatus: isJobPostedByHouseOwner.jobStatus,
-//               paymentStatus: isJobPostedByHouseOwner.paymentInfo.status
-//             },
-//             token
-//           });
-//         }
-//         else{
-
-//           res.status(StatusCodes.CREATED).json({
-//             user: {
-//               id: user._id,
-//               role: user.userRole
-//             },
-//             token
-//           });
-//         }
-
-//       } else if (user.userRole === 'shoveller') {
-//         res.status(StatusCodes.CREATED).json({
-//           user: {
-//             id: user._id,
-//             role: user.userRole,
-//             chargesEnabled: user.chargesEnabled,
-//             stripeAccountId: user.stripeAccountId
-//           },
-//           token
-//         });
-//       } else if (user.userRole === 'admin') {
-//         res.status(StatusCodes.CREATED).json({
-//           user: {
-//             id: user._id,
-//             role: user.userRole
-//           },
-//           token
-//         });
-//       }
-
-//     } catch (err) {
-//       console.log('Error during user registration:', err);
-//       res.status(400).json({ error: 'Invalid User Data', message: err.message });
-//     }
-//   });
-// };
-
 const register = async (req, res) => {
   upload.single("image")(req, res, async (err) => {
     if (err) {
@@ -153,7 +55,39 @@ const register = async (req, res) => {
       }
 
       // Create the user in the database, including the imageUrl
-      const user = await User.create({ ...req.body, imageUrl });
+      //check if user role is shvoeller and refferal code is valid
+      const user = {};
+      if (req.body.userRole === "shoveller" && req.body.referredBy) {
+        //check referral code is validrs
+        const referredBy = await User.find({ referralCode: req.body.referredBy });
+        if (referredBy.length === 0) {
+          return res.status(200).json({ error: "Invalid referral code" });
+        } else {
+          const shoveller = {
+            name: req.body.name,
+            email: req.body.email,
+            password: req.body.password,
+            userRole: req.body.userRole,
+            latitude: req.body.latitude,
+            longitude: req.body.longitude,
+            userName: req.body.userName,
+            phone: req.body.phone,
+            address: req.body.address,
+            servicesProvide: req.body.servicesProvide,
+            stripeAccountId: req.body.stripeAccountId,
+            chargesEnabled: req.body.chargesEnabled,
+            reason: req.body.reason,
+            stripeAccountStatus: req.body.stripeAccountStatus,
+            imageUrl,
+            referredBy: referredBy[0]._id,
+          }
+           user = await User.create({ shoveller });
+        }
+
+      }
+      else {
+         user = await User.create({ ...req.body, imageUrl });
+      }
 
       // Generate a JWT token
       const token = user.createJWT();
@@ -529,7 +463,7 @@ const get_Shoveler_referral_code = async (req, res, next) => {
   }
 }
 
-const get_shoveler_referral_by = async (req, res, next) => {
+const sendRefererPayment = async (req, res, next) => {
   try {
     const { id: userId } = req.params;
     const user = await User.findById(userId);
@@ -538,9 +472,18 @@ const get_shoveler_referral_by = async (req, res, next) => {
     }
     const referredBy = await User.findById(user.referredBy);
     if (!referredBy) {
-      throw new BadRequestError("Some error occured");
+      throw new BadRequestError("referredBy user not found");
     }
-    res.status(StatusCodes.OK).json({ referredBy: referredBy });
+
+    // Send payment to the referredBy user and check if the paymet method is valid
+    if(referredBy.chargesEnabled && referredBy.stripeAccountId) {
+      // Send payment to the referredBy user
+      // Code to send payment to the referredBy user
+      res.status(StatusCodes.OK).json({ referredBy: referredBy });
+    }
+    else {
+      throw new BadRequestError("referredBy user does not have a valid payment method");
+    }
   }
   catch (err) {
     next(err);
@@ -562,6 +505,6 @@ module.exports = {
   get_Shovelers_With_Probation_Completed,
   mark_Shoveler_Probation,
   get_Shoveler_referral_code,
-  get_shoveler_referral_by,
+  sendRefererPayment,
   getAllShovelersInfo
 };
