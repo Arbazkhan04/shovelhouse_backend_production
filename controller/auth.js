@@ -153,7 +153,7 @@ const login = async (req, res, next) => {
       //search on job as well to get the job details
       const isJobPostedByHouseOwner = await Job.find({
         houseOwnerId: user._id,
-        $or: [{ jobStatus: "open" }, { jobStatus: "in progress" }],
+        $or: [{ jobStatus: "open" }, { jobStatus: "in-progress" }],
       });
 
       //check houseowner job posted status
