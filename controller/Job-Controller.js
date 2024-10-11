@@ -115,7 +115,7 @@ const getListOfShovellerWhoAppliedOnJobs = async (req, res) => {
 const getJobsInWhichShovllerApplied = async (req, res) => {
   try {
     const { shovellerId } = req.params;
-    const jobs = await Job.find({ 'ShovelerInfo.ShovelerId': shovellerId });
+    const jobs = await Job.find({ 'ShovelerInfo.ShovelerId': shovellerId }).populate('houseOwnerId', 'name');
     return res.status(200).json({ jobs });
   } catch (error) {
     return res.status(500).json({ message: "Error getting the list of jobs" });

@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { register, login, getAllUsers, resetPassword, forgotPassword, searchUsers, updateUser, get_Shovelers_With_Probation_Completed
+const { register, login, getAllUsers, getUserName,resetPassword, forgotPassword, searchUsers, updateUser, get_Shovelers_With_Probation_Completed
     , changeUserStatus, mark_Shoveler_Probation, get_Shoveler_referral_code, sendRefererPayment,
     getAllShovelersInfo
 } = require('../controller/auth')
@@ -13,7 +13,7 @@ router.get('/', auth, authorizeRoles('admin'), getAllUsers)
 
 router.get('/searchUsers', auth, authorizeRoles('admin'), searchUsers)
 router.get('/getAllShovelersInfo', auth, authorizeRoles('admin'), getAllShovelersInfo)
-
+router.get('/getUserName/:userId', getUserName);
 router.get('/get_Shoveler_referral_code/:id', get_Shoveler_referral_code)
 router.get('/get_Shovelers_With_Probation_Completed', auth, authorizeRoles('admin'), get_Shovelers_With_Probation_Completed)
 router.get('/sendRefererPayment/:id', sendRefererPayment)

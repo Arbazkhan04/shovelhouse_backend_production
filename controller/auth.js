@@ -234,6 +234,19 @@ const login = async (req, res, next) => {
   }
 };
 
+const getUserName = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new BadRequestError("No user found with this ID");
+    }
+    res.status(StatusCodes.OK).json({ userName: user.userName });
+  }catch(error){
+    next(error);
+  }
+}
+
 const getAllUsers = async (req, res) => {
   const users = await User.find({}).sort("createdAt");
   res.status(StatusCodes.OK).json({ users, count: users.length });
@@ -534,5 +547,6 @@ module.exports = {
   mark_Shoveler_Probation,
   get_Shoveler_referral_code,
   sendRefererPayment,
-  getAllShovelersInfo
+  getAllShovelersInfo,
+  getUserName,
 };
