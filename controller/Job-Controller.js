@@ -2,12 +2,13 @@ const Job = require('../models/Job');
 const User = require('../models/User');
 const { BadRequestError, NotFoundError } = require('../errors/index');
 const { StatusCodes } = require('http-status-codes')
+const sendEmail = require("../utlis/sendEmail.js");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const getAllJobs = async (req, res) => {
   try {
     // Find all jobs with status 'open' and not 'in-progress', and populate house owner's name
-    const jobs = await Job.find({ })
+    const jobs = await Job.find({})
       .populate({
         path: 'houseOwnerId',
         select: 'name imageUrl', // Choose fields to return from the User schema
@@ -111,16 +112,75 @@ const getListOfShovellerWhoAppliedOnJobs = async (req, res) => {
 };
 
 
-//get all jobs in which shovller has applied
+// const getJobsInWhichShovllerApplied = async (req, res) => {
+  //   try {
+    //     const { shovellerId } = req.params;
+    //     const jobs = await Job.find({ 'ShovelerInfo.ShovelerId': shovellerId }).populate('houseOwnerId', 'name');
+    //     return res.status(200).json({ jobs });
+    //   } catch (error) {
+      //     return res.status(500).json({ message: "Error getting the list of jobs" });
+      //   }
+      // }
+      
+      //get all jobs in which shovller has applied
 const getJobsInWhichShovllerApplied = async (req, res) => {
   try {
-    const { shovellerId } = req.params;
-    const jobs = await Job.find({ 'ShovelerInfo.ShovelerId': shovellerId }).populate('houseOwnerId', 'name');
+
+      const { shovellerId } = req.params;
+
+    // Find jobs where PayoutStatus is not 'paid' or doesn't exist
+    const jobs = await Job.find({
+      'ShovelerInfo.ShovelerId': shovellerId, // Match the specific shoveller
+      $or: [
+        { 'ShovelerInfo.PayoutStatus': { $ne: 'paid' } },  // PayoutStatus is not 'paid'
+        { 'ShovelerInfo.PayoutStatus': { $exists: false } }  // PayoutStatus doesn't exist
+      ]
+    }).populate('houseOwnerId', 'name');
+
     return res.status(200).json({ jobs });
   } catch (error) {
-    return res.status(500).json({ message: "Error getting the list of jobs" });
+    return res.status(500).json({ message: error.message });
   }
 }
+const getShovellerJobStatusAndShovellerName = async (req, res) => {
+  try {
+    const { jobId, shovellerId } = req.query;
+    console.log(jobId, shovellerId);
+
+    // Fetch the specific job where the shoveller is part of ShovelerInfo
+    const job = await Job.findOne({ _id: jobId, 'ShovelerInfo.ShovelerId': shovellerId })
+      .select('ShovelerInfo') // Select only the ShovelerInfo field
+      .populate({
+        path: 'ShovelerInfo.ShovelerId', // Populate the ShovelerId with User data
+        select: 'name' // Select only the name field from the User schema
+      });
+
+    if (!job) {
+      return res.status(404).json({ message: "Job not found or shoveller not associated with this job" });
+    }
+
+    // Find the specific shoveller's info in the ShovelerInfo array
+    const shovellerInfo = job.ShovelerInfo.find(
+      (info) => info.ShovelerId._id.toString() === shovellerId
+    );
+
+    if (!shovellerInfo) {
+      return res.status(404).json({ message: "Shoveller information not found in this job" });
+    }
+
+    // Return the shoveller's action (status) and name for this job
+    return res.status(200).json({
+      shovellerAction: shovellerInfo.shovellerAction,
+      shovellerName: shovellerInfo.ShovelerId.name // Assuming 'name' is in the User schema
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Error getting the shoveller job status" });
+  }
+};
+
+
+
+
 
 
 
@@ -259,6 +319,8 @@ const markJobAsCompleted = async (req, res) => {
     if (!job) {
       return res.status(404).json({ message: "Job or shoveller not found" });
     }
+    const shoveller = await User.findById(shovellerId);
+    const houseOwner = await User.findById(job.houseOwnerId); // Assuming you store houseOwnerId in the job
 
     // If houseOwner marks the job as completed
     if (role === 'houseOwner') {
@@ -270,7 +332,7 @@ const markJobAsCompleted = async (req, res) => {
       await Job.findByIdAndUpdate(jobId, { 'paymentInfo.status': 'capture' }, { new: true });
 
       // Retrieve the shoveller's Stripe account ID from the User model
-      const shoveller = await User.findById(shovellerId);
+      // const shoveller = await User.findById(shovellerId);
       if (!shoveller || !shoveller.stripeAccountId) {
         return res.status(404).json({ message: "Shoveller's Stripe account not found" });
       }
@@ -278,23 +340,7 @@ const markJobAsCompleted = async (req, res) => {
       const totalAmount = job.paymentInfo.amount; // 30 USD (amount you stored)
       const platformFee = 0.20 * totalAmount; // 20% platform charge
       const amountForShoveller = totalAmount - platformFee; // Amount to be sent to the shoveller
-  
-      // // Transfer the payout to the shoveller in CAD
-      // const payout = await stripe.transfers.create({
-      //   amount: Math.round(amountForShoveller), // amount in cents (e.g., 2400 for 24.00 USD)
-      //   currency: 'cad', // Set the currency to CAD for the shoveller
-      //   destination: shoveller.stripeAccountId, // Use the shoveller's Stripe account ID
-      // });
 
-      
-
-
-      // // if there is payout update the status of the job
-      // if(payout){
-      //   await Job.findByIdAndUpdate(jobId, { 'paymentInfo.payout': 'completed' }, { new: true });
-      // }
-
-      // console.log('Payout:', payout);  // Log the payout
 
       try {
         // Transfer the payout to the shoveller in CAD
@@ -303,7 +349,7 @@ const markJobAsCompleted = async (req, res) => {
           currency: 'cad', // Set the currency to CAD for the shoveller
           destination: shoveller.stripeAccountId, // Use the shoveller's Stripe account ID
         });
-      
+
         // If the transfer is successful, update the job status
         await Job.findOneAndUpdate(
           {
@@ -316,9 +362,55 @@ const markJobAsCompleted = async (req, res) => {
             }
           },
           { new: true }
-        );        
+        );
         console.log('Payout successful:', payout);
-      
+
+        // Increment the job count for the shoveller
+        await User.findByIdAndUpdate(
+          shovellerId,
+          { $inc: { jobCount: 1 } }, // Increment jobCount by 1
+          { new: true }
+        );
+
+        // Send an email to the shoveller
+        // Define updated HTML content for the email
+        const htmlContent = `
+<html>
+  <head>
+    <style>
+      body { font-family: Arial, sans-serif; font-size: 16px; color: #333; }
+      .header { background-color: #f8f8f8; padding: 20px 5px; text-align: center; }
+      .content { padding: 20px 5px; }
+      .footer { background-color: #f8f8f8; padding: 20px 5px; text-align: center; font-size: 14px; }
+      .btn-reset { background-color: #4bcc5a; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
+      .payment-header { font-weight: 700; font-size: 30px; color: #4bcc5a; }
+      .payment-amount { font-weight: bold; font-size: 20px; }
+      .highlight { color: #4bcc5a; font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <p class="payment-header">Congratulations! Your Payment is Complete</p>
+    </div>
+    <div class="content">
+      <p>Hello,</p>
+      <p>We're excited to inform you that your payment for the completed job has been successfully transferred to your account. You have received a total of <span class="payment-amount">$${amountForShoveller / 100} CAD</span>.</p>
+      <p>Thank you for providing excellent service! You can review the payment details in your Shovel-House account.</p>
+      <p>If you have any questions, feel free to <a href="mailto:support@shovelhouse.com" class="highlight">contact our support team</a>.</p>
+    </div>
+    <div class="footer">
+      <p>Thank you for being part of Shovel-House!</p>
+      <p><strong>Shovel-House Team</strong></p>
+    </div>
+  </body>
+</html>
+`;
+
+        await sendEmail({
+          to: shoveller.email,
+          subject: "Payment information for completed job",
+          html: htmlContent, // Send HTML content here
+        });
       } catch (error) {
         await Job.findOneAndUpdate(
           {
@@ -332,10 +424,55 @@ const markJobAsCompleted = async (req, res) => {
           },
           { new: true }
         );
-        
+
         console.error('Error transferring to shoveller:', error.message);
       }
-      
+
+    }
+    else if (role === 'shoveller') {
+      // If shoveller marks the job as completed
+      // Send an email to the house owner
+      // Define HTML content for the houseowner email
+      const yourPageLink = `http://localhost:3000/houseowner/serviceProgress`;
+const htmlContentHouseOwner = `
+<html>
+  <head>
+    <style>
+      body { font-family: Arial, sans-serif; font-size: 16px; color: #333; }
+      .header { background-color: #f8f8f8; padding: 20px 5px; text-align: center; }
+      .content { padding: 20px 5px; }
+      .footer { background-color: #f8f8f8; padding: 20px 5px; text-align: center; font-size: 14px; }
+      .btn { background-color: #4bcc5a; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold; display: inline-block; }
+      .job-status-header { font-weight: 700; font-size: 30px; color: #4bcc5a; }
+      .highlight { color: #4bcc5a; font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <p class="job-status-header">Job Marked as Completed!</p>
+    </div>
+    <div class="content">
+      <p>Hello,</p>
+      <p>The job you posted has been marked as <span class="highlight">completed</span> by the shoveller. You can now review the work and either confirm the completion or raise a query if you believe the job is not done satisfactorily.</p>
+      <p>To accept the job as complete or submit a request for further review, click the button below:</p>
+      <p>
+        <a href="${yourPageLink}" class="btn">Review Job Status</a>
+      </p>
+      <p>If you have any questions, feel free to <a href="mailto:support@shovelhouse.com" class="highlight">contact our support team</a>.</p>
+    </div>
+    <div class="footer">
+      <p>Thank you for choosing Shovel-House!</p>
+      <p><strong>Shovel-House Team</strong></p>
+    </div>
+  </body>
+</html>
+`;
+  
+        await sendEmail({
+          to: houseOwner.email,
+          subject: "Job marked as completed by the shoveller",
+          html: htmlContentHouseOwner, // Send HTML content here
+        });
     }
 
     // Return the updated job
@@ -544,8 +681,8 @@ const updateJob = async (req, res) => {
 const getAllJobsInfo = async (req, res, next) => {
   try {
     // Step 1: Fetch all jobs from the jobs schema
-    const jobs = await Job.find({ });
-    
+    const jobs = await Job.find({});
+
     if (!jobs) {
       throw new BadRequestError("No jobs found");
     }
@@ -559,7 +696,7 @@ const getAllJobsInfo = async (req, res, next) => {
         userDetails: user
       }
     });
-    
+
 
     // Step 3: Wait for all the promises to resolve
     const jobsInfo = await Promise.all(jobInfoPromises);
@@ -584,5 +721,6 @@ module.exports = {
   markJobAsCompleted,
   cancelJob,
   markedJobAsUnCompleted,
-  getAllJobsInfo
+  getAllJobsInfo,
+  getShovellerJobStatusAndShovellerName
 }
