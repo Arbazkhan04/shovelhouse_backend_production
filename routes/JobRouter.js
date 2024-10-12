@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { getAllJobsInfo, createJob, getAllJobs, getJob, findJob, updateJob, updateJobStatusForShovellerAcceptedJob, getListOfShovellerWhoAppliedOnJobs,updateHouseOwnerDecision,getJobsInWhichShovllerApplied, markJobAsCompleted,cancelJob, markedJobAsUnCompleted } = require('../controller/Job-Controller')
+const { getAllJobsInfo, createJob, getAllJobs, getJob, findJob, updateJob, updateJobStatusForShovellerAcceptedJob, getListOfShovellerWhoAppliedOnJobs,updateHouseOwnerDecision,getJobsInWhichShovllerApplied, markJobAsCompleted,cancelJob, markedJobAsUnCompleted, getShovellerJobStatusAndShovellerName } = require('../controller/Job-Controller')
 const { auth, authorizeRoles } = require('../middleware/authentication')
 
 router.get('/getAllJobs', getAllJobs)
@@ -15,6 +15,7 @@ router.get('/getJobsInWhichShovllerApplied/:shovellerId', getJobsInWhichShovller
 router.post('/markJobAsCompleted',markJobAsCompleted);  //mark job as completed by house owner and shoveller as well if that is an houseowner then will capuutre the payement and payout to shoeveller as well
 router.post('/cancelJob',cancelJob); //cancel job by house owner
 router.post('/markedJobAsUnCompleted', markedJobAsUnCompleted); //mark job as uncompleted by admin
+router.get('/getShovellerJobStatusAndShovellerName', getShovellerJobStatusAndShovellerName);
 
 // admin
 router.get('/getAllJobsInfo', auth, authorizeRoles('admin'), getAllJobsInfo)

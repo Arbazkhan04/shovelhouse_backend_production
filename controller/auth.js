@@ -150,11 +150,13 @@ const login = async (req, res, next) => {
     const token = user.createJWT();
     // Send response based on user role
     if (user.userRole === "houseOwner") {
+      
       //search on job as well to get the job details
       const isJobPostedByHouseOwner = await Job.find({
         houseOwnerId: user._id,
         $or: [{ jobStatus: "open" }, { jobStatus: "in-progress" }],
       });
+      
 
       //check houseowner job posted status
       if (isJobPostedByHouseOwner.length > 0) {
@@ -164,11 +166,12 @@ const login = async (req, res, next) => {
           // find the job who is accepted by house owner
           let shovellerId;
           for(let i=0; i<job.ShovelerInfo.length; i++){
-            if(job.ShovelerInfo[i].shovellerAction === "accepted" && job.ShovelerInfo[i].houseOwnerAction === "accepted"){
+            if((job.ShovelerInfo[i].shovellerAction === "accepted" || job.ShovelerInfo[i].shovellerAction === "completed" ) && job.ShovelerInfo[i].houseOwnerAction === "accepted"){
               shovellerId = job.ShovelerInfo[i].ShovelerId;
               break;
             }
           }
+          
           res.status(StatusCodes.CREATED).json({
             user: {
               jobId: job._id,
