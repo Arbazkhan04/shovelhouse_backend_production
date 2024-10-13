@@ -681,7 +681,7 @@ const updateJob = async (req, res) => {
 const getAllJobsInfo = async (req, res, next) => {
   try {
     // Step 1: Fetch all jobs from the jobs schema
-    const jobs = await Job.find({});
+    const jobs = await Job.find({jobStatus : 'in-progress'});
 
     if (!jobs) {
       throw new BadRequestError("No jobs found");
@@ -691,9 +691,22 @@ const getAllJobsInfo = async (req, res, next) => {
     const jobInfoPromises = jobs.map(async (job) => {
       const id = job.houseOwnerId
       const user = await User.findById({ _id: id });
+      var shovelerId = null;
+      var shovelerAction = null;
+      var houseOwnerAction = null;
+      job.ShovelerInfo.forEach((shoveler) => {
+        if (shoveler.houseOwnerAction === 'accepted') {
+          shovelerId = shoveler.ShovelerId;
+          shovelerAction = shoveler.shovellerAction;
+          houseOwnerAction = shoveler.houseOwnerAction;
+        }
+      });
       return {
         jobDetails: job,
-        userDetails: user
+        userDetails: user,
+        shovelerId: shovelerId,
+        shovelerAction: shovelerAction,
+        houseOwnerAction: houseOwnerAction
       }
     });
 

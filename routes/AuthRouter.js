@@ -4,7 +4,6 @@ const { register, login, getAllUsers, getUserName,resetPassword, forgotPassword,
     , changeUserStatus, mark_Shoveler_Probation, get_Shoveler_referral_code, sendRefererPayment,
     getAllShovelersInfo
 } = require('../controller/auth')
-const { getAllJobsInfo } = require('../controller/Job-Controller');
 const { auth, authorizeRoles } = require('../middleware/authentication')
 
 
