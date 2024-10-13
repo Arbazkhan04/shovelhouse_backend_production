@@ -4,13 +4,12 @@ const {createQuery, getAllQueries, getQuery, filterQueries, closeQuery, updateQu
 const { auth, authorizeRoles } = require('../middleware/authentication')
 
 
-router.get('/createQuery', createQuery);
+router.post('/createQuery', createQuery);
 router.get('/getAllQueries', auth, authorizeRoles('admin'), getAllQueries);
 router.get('/filterQueries', auth, authorizeRoles('admin'), filterQueries);
 router.get('/getQuery/:id', auth, authorizeRoles('admin'), getQuery);
 router.patch('/updateQuery/:id', auth, authorizeRoles('admin'), updateQuery);
 router.patch('/closeQuery/:id', auth, authorizeRoles('admin'), closeQuery);
-
 
 
 module.exports = router;

@@ -7,6 +7,11 @@ const querySchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
+    jobId: {
+        type: Schema.Types.ObjectId,
+        ref: 'Job',
+        required: true,
+    },
     title: {
         type: String,
         required: true,
