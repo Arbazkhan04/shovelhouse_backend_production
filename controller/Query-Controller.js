@@ -1,5 +1,6 @@
 const Query = require("../models/Query");
 const User = require("../models/User");
+const Job = require('../models/Job.js')
 const { BadRequestError, NotFoundError } = require("../errors/index");
 const { StatusCodes } = require("http-status-codes");
 const sendEmail = require("../utlis/sendEmail.js");
@@ -7,8 +8,24 @@ const sendEmail = require("../utlis/sendEmail.js");
 const getAllQueries = async (req, res, next) => {
   try {
     const queries = await Query.find({}).sort("createdAt");
-    res.status(StatusCodes.OK).json({ queries, count: queries.length });
+
+    const queriesPromises = queries.map(async (query) => {
+      const id = query.userId
+      const user = await User.findById({ _id: id });
+      const job = await Job.findById({ _id: query.jobId });
+      return {
+        query,
+        role: user.userRole,
+        applyJobCancel: job.isJobCancel,
+      }
+    });
+
+    // Step 3: Wait for all the promises to resolve
+    const allQueries = await Promise.all(queriesPromises);
+
+    res.status(StatusCodes.OK).json({ allQueries, count: allQueries.length });
   } catch (error) {
+    console.log(error);
     next(error);
   }
 };
@@ -107,6 +124,20 @@ const closeQuery = async (req, res, next) => {
   }
 };
 
+const deleteQuery = async (req, res, next) => {
+  const { id: queryId } = req.params;
+  try {
+    const query = await Query.findOneAndDelete({ _id: queryId });
+    if (!query) {
+      throw new NotFoundError(`No query with id: ${queryId}`);
+    }
+    res.status(StatusCodes.OK).json({ query });
+  }
+  catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getAllQueries,
   filterQueries,
@@ -114,4 +145,5 @@ module.exports = {
   createQuery,
   updateQuery,
   closeQuery,
+  deleteQuery
 };
