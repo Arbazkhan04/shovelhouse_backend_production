@@ -16,6 +16,8 @@ const getAllQueries = async (req, res, next) => {
       return {
         query,
         role: user.userRole,
+        name: user.userName,
+        email: user.email,
         applyJobCancel: job.isJobCancel,
       }
     });
