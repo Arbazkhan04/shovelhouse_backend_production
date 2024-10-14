@@ -57,6 +57,13 @@ const jobSchema = new Schema({
       required: true,
     }
   },
+  // when shoveller mark the job as completed in frontend we will disable the cnacel button 
+  // if the shvoeller = completed and isRequestedForCancel = false hide the cancel button 
+  // if the shoveller = completed and isRequestedForCancel = true show the cancel button because the shoveller requested to cancel the job
+  isRequestedForCancel:{
+    type:Boolean,
+    default:false
+  },
 
   scheduledTime:{
     hour:{type:String, required:true},

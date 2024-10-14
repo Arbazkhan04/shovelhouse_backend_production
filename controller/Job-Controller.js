@@ -111,16 +111,6 @@ const getListOfShovellerWhoAppliedOnJobs = async (req, res) => {
   }
 };
 
-
-// const getJobsInWhichShovllerApplied = async (req, res) => {
-  //   try {
-    //     const { shovellerId } = req.params;
-    //     const jobs = await Job.find({ 'ShovelerInfo.ShovelerId': shovellerId }).populate('houseOwnerId', 'name');
-    //     return res.status(200).json({ jobs });
-    //   } catch (error) {
-      //     return res.status(500).json({ message: "Error getting the list of jobs" });
-      //   }
-      // }
       
       //get all jobs in which shovller has applied
 const getJobsInWhichShovllerApplied = async (req, res) => {
@@ -142,47 +132,46 @@ const getJobsInWhichShovllerApplied = async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 }
+
+
 const getShovellerJobStatusAndShovellerName = async (req, res) => {
   try {
     const { jobId, shovellerId } = req.query;
     console.log(jobId, shovellerId);
 
-    // Fetch the specific job where the shoveller is part of ShovelerInfo
-    const job = await Job.findOne({ _id: jobId, 'ShovelerInfo.ShovelerId': shovellerId })
-      .select('ShovelerInfo') // Select only the ShovelerInfo field
+    // Fetch the job and return only the specific ShovelerInfo object where ShovelerId matches
+    const job = await Job.findOne({
+      _id: jobId,
+      'ShovelerInfo.ShovelerId': shovellerId // Match specific ShovelerId
+    })
+      .select({ 
+        ShovelerInfo: { $elemMatch: { ShovelerId: shovellerId } }, // Only return the matching ShovelerInfo object
+        isRequestedForCancel: 1 // Include isRequestedForCancel field
+      })
       .populate({
-        path: 'ShovelerInfo.ShovelerId', // Populate the ShovelerId with User data
+        path: 'ShovelerInfo.ShovelerId', // Populate ShovelerId within the ShovelerInfo array
         select: 'name' // Select only the name field from the User schema
       });
 
-    if (!job) {
+    // If no job found or the shoveller is not associated with the job
+    if (!job || !job.ShovelerInfo.length) {
       return res.status(404).json({ message: "Job not found or shoveller not associated with this job" });
     }
 
-    // Find the specific shoveller's info in the ShovelerInfo array
-    const shovellerInfo = job.ShovelerInfo.find(
-      (info) => info.ShovelerId._id.toString() === shovellerId
-    );
+    // Since only the matching ShovelerInfo object is returned, we can directly use it
+    const shovellerInfo = job.ShovelerInfo[0];
 
-    if (!shovellerInfo) {
-      return res.status(404).json({ message: "Shoveller information not found in this job" });
-    }
-
-    // Return the shoveller's action (status) and name for this job
+    // Return the shoveller's action (status), name, and isRequestedForCancel flag for this job
     return res.status(200).json({
       shovellerAction: shovellerInfo.shovellerAction,
-      shovellerName: shovellerInfo.ShovelerId.name // Assuming 'name' is in the User schema
+      shovellerName: shovellerInfo.ShovelerId.name, // Assuming 'name' is in the User schema
+      isRequestedForCancel: job.isRequestedForCancel // Returning the job's isRequestedForCancel field
     });
   } catch (error) {
+    console.error(error);
     return res.status(500).json({ message: "Error getting the shoveller job status" });
   }
 };
-
-
-
-
-
-
 
 
 const createJob = async (req, res) => {
@@ -279,6 +268,25 @@ const updateHouseOwnerDecision = async (req, res) => {
   }
 };
 
+
+const feedbackByHouseOwner = async (req, res) => {
+  const { jobId, jobRating, houseOwnerFeedback } = req.body;
+  try {
+    const job = await Job.findByIdAndUpdate(jobId, {
+      jobRating,
+      houseOwnerFeedback,
+    }, { new: true });
+
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    return res.status(200).json({ message: "Feedback submitted successfully", job });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Error submitting feedback" });
+  }
+}
 
 // Mark the job as completed by shoveller or houseOwner
 const markJobAsCompleted = async (req, res) => {
@@ -484,46 +492,200 @@ const htmlContentHouseOwner = `
   }
 };
 
+//houseowner requested for cancel the job enable the cancle button for houseonwer
+const houseOwnerRequestedForCancel = async (req, res) => {
+  try {
+    const { jobId } = req.body;
+
+    // Use `await` to properly handle the async operation
+    const job = await Job.findOneAndUpdate(
+      { _id: jobId },
+      { isRequestedForCancel: true },
+      { new: true }
+    ).lean(); // Use `.lean()` to get a plain JavaScript object instead of a Mongoose document
+
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    // Return only the necessary job fields (avoiding circular references)
+    return res.status(200).json({ message: "Job status updated to cancel requested", job });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Error updating the job" });
+  }
+};
 
 
-//cancel job for houseonwer and return his payment back 
-const cancelJob = async (req, res) => {
+const cancelJob = async (req, res) => { 
   const { jobId, shovellerId } = req.body;
-  const job = await Job.findById(jobId);
-  if (!job) {
-    return res.status(200).json({ err: "Job not found" });
-  }
-  // Check if the job is already completed by shoveller
-  const shoveller = job.ShovelerInfo.find(s => s.ShovelerId.toString() === shovellerId);
-  if (!shoveller) {
-    return res.status(200).json({ err: "Shoveller not found" });
-  }
-  if (shoveller.shovellerAction === 'completed') {
-    return res.status(200).json({ err: "Shoveller already marked this job as completed if you need assisitance support you can react out to us" });
 
-  } else {
-    //update the job status to canceled
-    const updatedJob = await Job.findByIdAndUpdate(jobId, { jobStatus: 'canceled' }, { new: true });
-    //update the shoveller action to canceled
-    const updatedShoveller = await Job.findOneAndUpdate(
-      {
-        _id: jobId,
-        'ShovelerInfo.ShovelerId': shovellerId,  // Match based on shoveller's ID
+  try {
+    // Find the job by jobId
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(200).json({ err: "Job not found" });
+    }
+
+    if(!job.paymentIntentId) {
+      return res.status(200).json({ err: "No payment found for this job" });    
+    }    // Check if the job is already completed
+    if (job.jobStatus === 'completed') {
+      return res.status(200).json({ err: "Job is already marked as completed" });
+    }
+
+    // Check if the specified shoveller is associated with the job
+    const shoveller = job.ShovelerInfo.find(s => s.ShovelerId.toString() === shovellerId);
+    if (!shoveller) {
+      return res.status(200).json({ err: "Shoveller not found" });
+    }
+
+    // Check if the job is already completed by shoveller
+    if (shoveller.shovellerAction === 'completed' && !job.isRequestedForCancel) {
+      return res.status(200).json({ 
+        err: "Shoveller already marked this job as completed. If you need assistance, please reach out to support."
+      });
+    }
+
+    // Cancel the payment
+    const cancellation = await stripe.paymentIntents.cancel(job.paymentIntentId);
+    if (cancellation.status !== 'canceled') {
+      return res.status(200).json({ err: "Failed to cancel payment" });
+    }
+
+    // Update the job status to 'canceled' and payment info
+    const updatedJob = await Job.findByIdAndUpdate(jobId, 
+      { 
+        jobStatus: 'canceled',
+        paymentInfo: { 
+          ...job.paymentInfo, // Preserve other payment fields like 'amount', 'paymentMethod'
+          status: 'canceled' 
+        }
       },
-      {
+      { new: true }
+    );
+    
+    // Update the shoveller's action to 'canceled'
+    await Job.updateOne(
+      { 
+        _id: jobId,
+        'ShovelerInfo.ShovelerId': shovellerId 
+      },
+      { 
         $set: {
-          'ShovelerInfo.$.shovellerAction': 'canceled',
+          'ShovelerInfo.$.houseOwnerAction': 'canceled',
         },
+      }
+    );
+
+    //send eamil to shvoeller and hosueowenr regarding to the hob cancelation
+    const shovellerEmail = await User.findById(shovellerId);
+    const houseOwnerEmail = await User.findById(job.houseOwnerId);
+
+
+    // Send an email to the shoveller with plain text
+    const shovellerEmailContent = `Hello ${shovellerEmail.name},\n\nThe job has been canceled by the house owner. If you have any questions, please contact support.`;
+    await sendEmail({
+      to: shovellerEmail.email,
+      subject: "Payment information for completed job",
+      text: shovellerEmailContent, // Send HTML content here
+    });
+
+    // Send an email to the house owner with plain text
+    const houseOwnerEmailContent = `
+    Hello ${houseOwnerEmail.name},
+    
+    We hope this message finds you well.
+    
+    We would like to inform you that the job has been successfully canceled as per your request. We have processed the return of your payment, and the funds should be reflected in your account shortly.
+    
+    If you have any further questions or need assistance, please don't hesitate to reach out to our support team. We're here to help!
+    
+    Thank you for choosing our service, and we look forward to assisting you again in the future.
+    
+    Best regards,
+    Shovel-House Team
+    `;
+        await sendEmail({
+      to: houseOwnerEmail.email,
+      subject: "Payment information for completed job",
+      text: houseOwnerEmailContent, // Send HTML content here
+    });
+
+    return res.status(200).json({ message: "Job canceled successfully", job: updatedJob });
+  
+  } catch (error) {
+    console.error(error); // Log the error for debugging
+    return res.status(200).json({ err: "An error occurred while canceling the job" });
+  }
+}
+
+// cancel the job if no shoveller has applied on his job and he requested for cancel
+const cancelJobIfNoShovellerApplied = async (req, res) => {
+  const { jobId } = req.body;
+  try {
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(200).json({ err: "Job not found" });
+    }
+    if(job.ShovelerInfo.length > 0 && (job.jobStatus === 'in-progress' || job.jobStatus === 'completed' || job.status === 'canceled')) {
+      return res.status(200).json({ err: `You cannot cancel this job becuase the job is already ${job.jobStatus}` });
+    }
+
+     // Ensure the paymentIntentId exists before attempting to cancel the payment
+     if (!job.paymentIntentId) {
+      return res.status(200).json({ err: "No payment found for this job" });
+    }
+
+    // Cancel the payment
+    const cancellation = await stripe.paymentIntents.cancel(job.paymentIntentId);
+    if (cancellation.status !== 'canceled') {
+      return res.status(200).json({ err: "Failed to cancel payment" });
+    }
+
+    // Update the job status to 'canceled' and payment info
+    const updatedJob =  await Job.findByIdAndUpdate(jobId, 
+      { 
+        jobStatus: 'canceled',
+        paymentInfo: { 
+          ...job.paymentInfo, // Preserve other payment fields like 'amount', 'paymentMethod'
+          status: 'canceled' 
+        }
       },
       { new: true }
     );
 
-    //return his payent back as well latar on we will implement the payment gateway
-    //return the updated job
-    return res.status(200).json({ message: "Job canceled successfully", job: updatedJob });
-  }
+    const houseowner = await User.findById(job.houseOwnerId);
 
+    const houseownerContent = `
+    Hello ${houseowner.name},
+    
+    We hope this message finds you well.
+    
+    We would like to inform you that the job has been successfully canceled as per your request. We have processed the return of your payment, and the funds should be reflected in your account shortly.
+    
+    If you have any further questions or need assistance, please don't hesitate to reach out to our support team. We're here to help!
+    
+    Thank you for choosing our service, and we look forward to assisting you again in the future.
+    
+    Best regards,
+    Shovel-House Team
+    `;
+      
+    await sendEmail({
+      to: houseowner.email,
+      subject: "Payment information for completed job",
+      text: houseownerContent, // Send HTML content here
+    });
+
+    return res.status(200).json({ message: "Job canceled successfully", job: updatedJob });
+    
+
+  } catch (error) {
+    return res.status(200).json({ err: error.message });
+  }
 }
+
 
 //revert the job into progress again if the houseonwe is not able to cancle the job and he requested for cancel
 const markedJobAsUnCompleted = async (req, res) => {
@@ -735,5 +897,8 @@ module.exports = {
   cancelJob,
   markedJobAsUnCompleted,
   getAllJobsInfo,
-  getShovellerJobStatusAndShovellerName
+  getShovellerJobStatusAndShovellerName,
+  feedbackByHouseOwner,
+  houseOwnerRequestedForCancel,
+  cancelJobIfNoShovellerApplied
 }
