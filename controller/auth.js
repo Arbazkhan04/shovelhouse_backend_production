@@ -121,7 +121,7 @@ const register = async (req, res) => {
           token,
         });
       } else {
-        res.status(200).json({ error: "Invalid user role" });
+        res.status(200).json({ error: "Invalid user role",message:"User role must be either houseOwner, shoveller or admin" });
       }
     } catch (err) {
       res
@@ -186,7 +186,7 @@ const login = async (req, res, next) => {
           });
         }
         //otherwise job is not in progess 
-        else{
+        else {
           res.status(StatusCodes.CREATED).json({
             user: {
               jobId: job._id,
@@ -261,7 +261,7 @@ const forgotPassword = async (req, res, next) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      throw new BadRequestError("No user with this email address");
+      return res.status(200).json({ error: 'No user found with this email' });
     }
 
     // Generate and get reset password token
@@ -324,14 +324,14 @@ const forgotPassword = async (req, res, next) => {
 
       await user.save();
 
-      throw new BadRequestError(error.message);
+      return res.status(200).json({ error: "Email could not be sent" });
     }
   } catch (error) {
-    next(error);
+    return res.status(200).json({ error: error.message });
   }
 };
 
-const resetPassword = async (req, res, next) => {
+const resetPassword = async (req, res) => {
   try {
     const resetPasswordToken = crypto
       .createHash("sha256")
@@ -344,7 +344,7 @@ const resetPassword = async (req, res, next) => {
     });
 
     if (!user) {
-      return res.json({ err: 'Invalid or expired token' });
+      return res.status(200).json({ error: 'Invalid or expired token' });
     }
 
     // Set new password
@@ -358,7 +358,7 @@ const resetPassword = async (req, res, next) => {
       .status(StatusCodes.OK)
       .json({ success: true, data: "Password reset successful" });
   } catch (err) {
-    next(err);
+    return res.status(200).json({ error: err.message });
   }
 };
 
@@ -374,7 +374,7 @@ const updateUser = async (req, res, next) => {
     }
     res.status(StatusCodes.OK).json({ user });
   } catch (error) {
-    next(error);
+    return res.status(200).json({ error: error.message });
   }
 };
 
