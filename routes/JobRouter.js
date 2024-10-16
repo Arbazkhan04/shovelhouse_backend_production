@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { getAllJobsInfo, createJob, getAllJobs, getJob, findJob, updateJob, updateJobStatusForShovellerAcceptedJob, getListOfShovellerWhoAppliedOnJobs,updateHouseOwnerDecision,getJobsInWhichShovllerApplied, markJobAsCompleted,cancelJob, markedJobAsUnCompleted, getShovellerJobStatusAndShovellerName,feedbackByHouseOwner,houseOwnerRequestedForCancel,cancelJobIfNoShovellerApplied } = require('../controller/Job-Controller')
+const { getAllJobsInfo, createJob, getAllJobs, getJob, findJob, updateJob, updateJobStatusForShovellerAcceptedJob, getListOfShovellerWhoAppliedOnJobs,updateHouseOwnerDecision,getJobsInWhichShovllerApplied, markJobAsCompleted,cancelJob, markedJobAsUnCompleted, getShovellerJobStatusAndShovellerName,feedbackByHouseOwner,houseOwnerRequestedForCancel,cancelJobIfNoShovellerApplied,isJobCompleted } = require('../controller/Job-Controller')
 const { auth, authorizeRoles } = require('../middleware/authentication')
 
 router.get('/getAllJobs', getAllJobs)
@@ -19,6 +19,7 @@ router.get('/getShovellerJobStatusAndShovellerName', getShovellerJobStatusAndSho
 router.post('/feedbackByHouseOwner', feedbackByHouseOwner); //feedback by house owner
 router.post('/houseOwnerRequestedForCancel', houseOwnerRequestedForCancel); //house owner requested for cancel the job
 router.post('/cancelJobIfNoShovellerApplied', cancelJobIfNoShovellerApplied); //cancel job if no shoveller applied on it
+router.post('/isJobCompleted', isJobCompleted); //check the job is completed or not
 
 // admin
 router.get('/getAllJobsInfo', auth, authorizeRoles('admin'), getAllJobsInfo)

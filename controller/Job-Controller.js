@@ -205,6 +205,7 @@ const createJob = async (req, res) => {
     return res.status(StatusCodes.BAD_REQUEST).json({ error: "Invalid job data && role" });
 
   } catch (err) {
+    console.log(err)
     throw new BadRequestError("Invalid job data");
   }
 }
@@ -337,7 +338,10 @@ const markJobAsCompleted = async (req, res) => {
       console.log('Payment captured:', paymentIntent);  // Log the payment intent
 
       // Update the payment status to 'capture'
-      await Job.findByIdAndUpdate(jobId, { 'paymentInfo.status': 'capture' }, { new: true });
+      await Job.findByIdAndUpdate(jobId, {paymentInfo: { 
+        ...job.paymentInfo, // Preserve other payment fields like 'amount', 'paymentMethod'
+        status: 'capture' 
+      }}, { new: true });
 
       // Retrieve the shoveller's Stripe account ID from the User model
       // const shoveller = await User.findById(shovellerId);
@@ -556,7 +560,7 @@ const cancelJob = async (req, res) => {
     // Update the job status to 'canceled' and payment info
     const updatedJob = await Job.findByIdAndUpdate(jobId, 
       { 
-        jobStatus: 'canceled',
+        jobStatus: 'not-anymore',
         paymentInfo: { 
           ...job.paymentInfo, // Preserve other payment fields like 'amount', 'paymentMethod'
           status: 'canceled' 
@@ -628,7 +632,7 @@ const cancelJobIfNoShovellerApplied = async (req, res) => {
     if (!job) {
       return res.status(200).json({ err: "Job not found" });
     }
-    if(job.ShovelerInfo.length > 0 && (job.jobStatus === 'in-progress' || job.jobStatus === 'completed' || job.status === 'canceled')) {
+    if(job.ShovelerInfo.length > 0 && (job.jobStatus === 'in-progress' || job.jobStatus === 'completed' || job.jobStatus === 'not-anymore')) {
       return res.status(200).json({ err: `You cannot cancel this job becuase the job is already ${job.jobStatus}` });
     }
 
@@ -646,7 +650,7 @@ const cancelJobIfNoShovellerApplied = async (req, res) => {
     // Update the job status to 'canceled' and payment info
     const updatedJob =  await Job.findByIdAndUpdate(jobId, 
       { 
-        jobStatus: 'canceled',
+        jobStatus: 'not-anymore',
         paymentInfo: { 
           ...job.paymentInfo, // Preserve other payment fields like 'amount', 'paymentMethod'
           status: 'canceled' 
@@ -883,6 +887,31 @@ const getAllJobsInfo = async (req, res, next) => {
   }
 };
 
+//check job status if completed then return jobStatus = completed jobId, id,
+const isJobCompleted = async(req,res) => {
+  const {jobId} = req.body;
+  try{  
+    const job = await Job.findById(jobId);
+    if(!job){
+      return res.status(200).json({err:"job not found"})
+    }
+
+    const user = await User.findById(job.houseOwnerId);
+      const token = user.createJWT();
+      return res.status(200).json({
+        user:{
+          jobId:job._id,
+          id:user._id,
+          role:user.userRole,
+          jobStatus:job.jobStatus,
+        },
+        token
+      })
+  } catch(error){
+    return res.status(200).json({err:error.message})
+  }
+}
+
 module.exports = {
   getAllJobs,
   createJob,
@@ -900,5 +929,6 @@ module.exports = {
   getShovellerJobStatusAndShovellerName,
   feedbackByHouseOwner,
   houseOwnerRequestedForCancel,
-  cancelJobIfNoShovellerApplied
+  cancelJobIfNoShovellerApplied,
+  isJobCompleted
 }
