@@ -13,7 +13,7 @@ const configureSocket = require('./socket/index.js'); // Import the Socket.IO co
 const Job = require('./models/Job')
 const User = require('./models/User')
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-require('./utlis/Scheduler.js')
+//require('./utlis/Scheduler.js')
 
 const app = express();
 const server = http.createServer(app);
