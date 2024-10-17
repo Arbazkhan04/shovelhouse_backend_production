@@ -9,6 +9,8 @@ const sendEmail = require("../utlis/sendEmail.js");
 const crypto = require("crypto");
 const { UnauthenticatedError } = require("../errors");
 const mongoose = require('mongoose'); // Ensure mongoose is imported
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
 // Initialize S3Client with credentials and region
 const s3 = new S3Client({
   region: process.env.AWS_S3_REGION, // e.g., 'us-east-1'
@@ -523,6 +525,69 @@ const sendRefererPayment = async (req, res, next) => {
     if(referredBy.chargesEnabled && referredBy.stripeAccountId) {
       // Send payment to the referredBy user
       // Code to send payment to the referredBy user
+
+      try {
+        // Transfer the payout to the shoveller in CAD
+        const payout = await stripe.transfers.create({
+          amount: Math.round(10000), // amount in cents
+          currency: 'cad', // Set the currency to CAD for the shoveller
+          destination: referredBy.stripeAccountId, // Use the shoveller's Stripe account ID
+        });
+
+        // If the transfer is successful, update the job status
+        await User.findOneAndUpdate(
+          {
+            _id: userId,
+          },
+          {
+            $set: {
+              probation:true // Update the payout status for the shoveller
+            }
+          },
+          { new: true }
+        );
+
+        const htmlContent = `
+<html>
+  <head>
+    <style>
+      body { font-family: Arial, sans-serif; font-size: 16px; color: #333; }
+      .header { background-color: #f8f8f8; padding: 20px 5px; text-align: center; }
+      .content { padding: 20px 5px; }
+      .footer { background-color: #f8f8f8; padding: 20px 5px; text-align: center; font-size: 14px; }
+      .btn-reset { background-color: #4bcc5a; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
+      .payment-header { font-weight: 700; font-size: 30px; color: #4bcc5a; }
+      .payment-amount { font-weight: bold; font-size: 20px; }
+      .highlight { color: #4bcc5a; font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <p class="payment-header">Congratulations! Referral Payment Completed</p>
+    </div>
+    <div class="content">
+      <p>Hello,</p>
+      <p>We are pleased to inform you that the shoveller you referred has successfully completed their probation period. As a token of appreciation, we have transferred a referral bonus of <span class="payment-amount">$${referralBonusAmount / 100} CAD</span> to your account.</p>
+      <p>Thank you for helping us grow our community! You can review the details of this referral payment in your Shovel-House account.</p>
+      <p>If you have any questions, feel free to <a href="mailto:support@shovelhouse.com" class="highlight">contact our support team</a>.</p>
+    </div>
+    <div class="footer">
+      <p>We appreciate your support in making Shovel-House a better place!</p>
+      <p><strong>Shovel-House Team</strong></p>
+    </div>
+  </body>
+</html>
+`;
+
+        await sendEmail({
+          to: referredBy.email,
+          subject: "Payment for referral",
+          html: htmlContent, // Send HTML content here
+        });
+      } catch (error) {
+        return res.status(200).json({ error:"Error transferring to refferal"})
+      }
+
       res.status(StatusCodes.OK).json({ referredBy: referredBy });
     }
     else {

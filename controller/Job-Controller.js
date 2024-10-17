@@ -181,7 +181,7 @@ const createJob = async (req, res) => {
     const user = await User.findById(req.params.houseOwnerId); // Assuming you have a User model
 
     if (!user) {
-      return res.status(StatusCodes.NOT_FOUND).json({ error: "Houseowner id not found in User" });
+      return res.status(200).json({ error: "Houseowner id not found in User" });
     }
 
     const token = user.createJWT();
@@ -202,11 +202,10 @@ const createJob = async (req, res) => {
     }
 
     // If the user is not a houseOwner
-    return res.status(StatusCodes.BAD_REQUEST).json({ error: "Invalid job data && role" });
+    return res.status(200).json({ error: "Invalid job data && role" });
 
   } catch (err) {
-    console.log(err)
-    throw new BadRequestError("Invalid job data");
+    return res.status(200).json({ error: err.message });
   }
 }
 
