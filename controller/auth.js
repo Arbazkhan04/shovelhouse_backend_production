@@ -516,6 +516,9 @@ const sendRefererPayment = async (req, res, next) => {
     if (!user) {
       throw new BadRequestError("No user found with this ID");
     }
+    if (user.probation === true) {
+      throw new BadRequestError("User is already has completed probation");
+    }
     const referredBy = await User.findById(user.referredBy);
     if (!referredBy) {
       throw new BadRequestError("referredBy user not found");
@@ -529,7 +532,7 @@ const sendRefererPayment = async (req, res, next) => {
       try {
         // Transfer the payout to the shoveller in CAD
         const payout = await stripe.transfers.create({
-          amount: Math.round(10000), // amount in cents
+          amount: Math.round(1000), // amount in cents
           currency: 'cad', // Set the currency to CAD for the shoveller
           destination: referredBy.stripeAccountId, // Use the shoveller's Stripe account ID
         });
@@ -567,7 +570,7 @@ const sendRefererPayment = async (req, res, next) => {
     </div>
     <div class="content">
       <p>Hello,</p>
-      <p>We are pleased to inform you that the shoveller you referred has successfully completed their probation period. As a token of appreciation, we have transferred a referral bonus of <span class="payment-amount">$${referralBonusAmount / 100} CAD</span> to your account.</p>
+      <p>We are pleased to inform you that the shoveller you referred has successfully completed their probation period. As a token of appreciation, we have transferred a referral bonus of <span class="payment-amount">$10 CAD</span> to your account.</p>
       <p>Thank you for helping us grow our community! You can review the details of this referral payment in your Shovel-House account.</p>
       <p>If you have any questions, feel free to <a href="mailto:support@shovelhouse.com" class="highlight">contact our support team</a>.</p>
     </div>
@@ -585,7 +588,7 @@ const sendRefererPayment = async (req, res, next) => {
           html: htmlContent, // Send HTML content here
         });
       } catch (error) {
-        return res.status(200).json({ error:"Error transferring to refferal"})
+        return res.status(200).json({ error:error.message})
       }
 
       res.status(StatusCodes.OK).json({ referredBy: referredBy });
