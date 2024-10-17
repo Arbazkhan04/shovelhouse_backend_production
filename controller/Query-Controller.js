@@ -12,6 +12,10 @@ const getAllQueries = async (req, res, next) => {
     const queriesPromises = queries.map(async (query) => {
       const id = query.userId
       const user = await User.findById({ _id: id });
+      let reason = null;
+      if (user.userRole === 'shoveller') { 
+        reason = user.reason;
+      }
       const job = await Job.findById({ _id: query.jobId });
       return {
         query,
@@ -19,6 +23,7 @@ const getAllQueries = async (req, res, next) => {
         name: user.userName,
         email: user.email,
         applyJobCancel: job.isJobCancel,
+        reason: reason
       }
     });
 

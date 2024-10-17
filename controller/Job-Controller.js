@@ -516,14 +516,14 @@ const houseOwnerRequestedForCancel = async (req, res) => {
     ).lean(); // Use `.lean()` to get a plain JavaScript object instead of a Mongoose document
 
     if (!job) {
-      return res.status(404).json({ message: "Job not found" });
+      return res.status(200).json({ message: "Job not found" });
     }
 
     // Return only the necessary job fields (avoiding circular references)
     return res.status(200).json({ message: "Job status updated to cancel requested", job });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ message: "Error updating the job" });
+    return res.status(200).json({ message: "Error updating the job" });
   }
 };
 
@@ -794,7 +794,7 @@ const findJob = async (req, res) => {
 
   // Check if latitude and longitude are provided and valid
   if (!latitude || !longitude) {
-    return res.status(400).json({ message: 'Please provide latitude and longitude in the query params' });
+    return res.status(200).json({ message: 'Please provide latitude and longitude in the query params' });
   }
 
   // Parse latitude and longitude to float and check validity
@@ -802,7 +802,7 @@ const findJob = async (req, res) => {
   const lon = parseFloat(longitude);
 
   if (isNaN(lat) || isNaN(lon)) {
-    return res.status(400).json({ message: 'Invalid latitude or longitude value' });
+    return res.status(200).json({ message: 'Invalid latitude or longitude value' });
   }
 
   try {
@@ -823,14 +823,14 @@ const findJob = async (req, res) => {
     ]);
 
     if (!jobs || jobs.length === 0) {
-      return res.status(404).json({ message: 'No jobs found near the given location' });
+      return res.status(200).json({ message: 'No jobs found near the given location' });
     }
 
     // Return the jobs sorted by proximity
     res.status(200).json({ jobs });
   } catch (error) {
     console.error('Error finding jobs:', error); // Add logging for debugging
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(200).json({ message: 'Server error', error: error.message });
   }
 };
 
