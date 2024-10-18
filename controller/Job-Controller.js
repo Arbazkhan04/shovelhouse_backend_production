@@ -304,6 +304,7 @@ const feedbackByHouseOwner = async (req, res) => {
 // Mark the job as completed by shoveller or houseOwner
 const markJobAsCompleted = async (req, res) => {
   const { jobId, shovellerId, role } = req.body;
+  console.log(jobId, shovellerId, role);  // Log the jobId, shovellerId, and role
 
   try {
     let updateAction = {};
@@ -315,7 +316,7 @@ const markJobAsCompleted = async (req, res) => {
           'ShovelerInfo.$.shovellerAction': 'completed',
         },
       };
-    } else if (role === 'houseOwner') {
+    } else if (role === 'houseOwner' || role === 'admin') {
       // Check if the role is 'houseOwner'
       updateAction = {
         $set: {
@@ -324,7 +325,7 @@ const markJobAsCompleted = async (req, res) => {
         },
       };
     } else {
-      return res.status(400).json({ message: "Invalid role" });
+      return res.status(200).json({ error: "Invalid role" });
     }
 
     // Find and update the specific shoveller's action
@@ -338,16 +339,21 @@ const markJobAsCompleted = async (req, res) => {
     );
 
     if (!job) {
-      return res.status(404).json({ message: "Job or shoveller not found" });
+      return res.status(200).json({ error: "Job or shoveller not found" });
     }
     const shoveller = await User.findById(shovellerId);
     const houseOwner = await User.findById(job.houseOwnerId); // Assuming you store houseOwnerId in the job
 
     // If houseOwner marks the job as completed
-    if (role === 'houseOwner') {
+    if (role === 'houseOwner' || role === 'admin') {
       // Capture the payment
+      
       const paymentIntent = await stripe.paymentIntents.capture(job.paymentIntentId);
+      if (paymentIntent.status === 'canceled') { 
+        return res.status(200).json({ error: "Payment captured is cancelled because it is older than 7 days" });
+      }
       console.log('Payment captured:', paymentIntent);  // Log the payment intent
+      
 
       // Update the payment status to 'capture'
       await Job.findByIdAndUpdate(jobId, {paymentInfo: { 
@@ -358,7 +364,7 @@ const markJobAsCompleted = async (req, res) => {
       // Retrieve the shoveller's Stripe account ID from the User model
       // const shoveller = await User.findById(shovellerId);
       if (!shoveller || !shoveller.stripeAccountId) {
-        return res.status(404).json({ message: "Shoveller's Stripe account not found" });
+        return res.status(200).json({ error: "Shoveller's Stripe account not found" });
       }
 
       const totalAmount = job.paymentInfo.amount; // 30 USD (amount you stored)
@@ -373,7 +379,6 @@ const markJobAsCompleted = async (req, res) => {
         currency: 'cad', // Set the currency to CAD for the shoveller
         destination: shoveller.stripeAccountId, // Use the shoveller's Stripe account ID
       });
-
       // If the transfer is successful, update the job status
       await Job.findOneAndUpdate(
         {
@@ -503,8 +508,8 @@ const htmlContentHouseOwner = `
     return res.status(200).json({ message: `${role} action updated`, job });
 
   } catch (error) {
-    console.log(error);
-    return res.status(500).json({ message: "Error updating the job" });
+    // console.log(error);
+    return res.status(200).json({ error: error.message });
   }
 };
 
@@ -521,14 +526,14 @@ const houseOwnerRequestedForCancel = async (req, res) => {
     ).lean(); // Use `.lean()` to get a plain JavaScript object instead of a Mongoose document
 
     if (!job) {
-      return res.status(404).json({ message: "Job not found" });
+      return res.status(200).json({ message: "Job not found" });
     }
 
     // Return only the necessary job fields (avoiding circular references)
     return res.status(200).json({ message: "Job status updated to cancel requested", job });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ message: "Error updating the job" });
+    return res.status(200).json({ message: "Error updating the job" });
   }
 };
 
