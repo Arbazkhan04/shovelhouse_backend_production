@@ -259,6 +259,19 @@ const getAllUsers = async (req, res) => {
   res.status(StatusCodes.OK).json({ users, count: users.length });
 };
 
+const getUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.json({error: "No user with this userId."})
+    }
+    res.status(StatusCodes.OK).json({ user });
+  } catch (error) {
+    return res.json({error: error.message});
+  }
+}
+
 const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -622,4 +635,5 @@ module.exports = {
   sendRefererPayment,
   getAllShovelersInfo,
   getUserName,
+  getUser
 };

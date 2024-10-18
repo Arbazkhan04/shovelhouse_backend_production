@@ -1,12 +1,14 @@
 const express = require('express')
 const router = express.Router()
-const { getAllJobsInfo, createJob, getAllJobs, getJob, findJob, updateJob, updateJobStatusForShovellerAcceptedJob, getListOfShovellerWhoAppliedOnJobs,updateHouseOwnerDecision,getJobsInWhichShovllerApplied, markJobAsCompleted,cancelJob, markedJobAsUnCompleted, getShovellerJobStatusAndShovellerName,feedbackByHouseOwner,houseOwnerRequestedForCancel,cancelJobIfNoShovellerApplied,isJobCompleted } = require('../controller/Job-Controller')
+const { getAllJobsInfo, getJobDetailsForShoveller, getJobDetailsForHouseOwner, createJob, getAllJobs, getJob, findJob, updateJob, updateJobStatusForShovellerAcceptedJob, getListOfShovellerWhoAppliedOnJobs,updateHouseOwnerDecision,getJobsInWhichShovllerApplied, markJobAsCompleted,cancelJob, markedJobAsUnCompleted, getShovellerJobStatusAndShovellerName,feedbackByHouseOwner,houseOwnerRequestedForCancel,cancelJobIfNoShovellerApplied,isJobCompleted } = require('../controller/Job-Controller')
 const { auth, authorizeRoles } = require('../middleware/authentication')
 
 router.get('/getAllJobs', getAllJobs)
 router.get('/findJob/:latitude/:longitude',auth,authorizeRoles('shoveller'), findJob)
 router.post('/createJob/:houseOwnerId', createJob)
 router.get('/getJob/:jobId', getJob)
+router.post('/getJobDetailsForShoveller/:jobId', getJobDetailsForShoveller)
+router.post('/getJobDetailsForHouseOwner/:jobId', getJobDetailsForHouseOwner)
 router.patch('/updateJob/:jobId', updateJob);
 router.post('/updateJobStatusForShovellerAcceptedJob', updateJobStatusForShovellerAcceptedJob);
 router.post('/updateHouseOwnerDecision', updateHouseOwnerDecision);
