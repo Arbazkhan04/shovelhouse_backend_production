@@ -4,7 +4,7 @@ const { getAllJobsInfo, createJob, getAllJobs, getJob, findJob, updateJob, updat
 const { auth, authorizeRoles } = require('../middleware/authentication')
 
 router.get('/getAllJobs', getAllJobs)
-router.get('/findJob',auth,authorizeRoles('shoveller'), findJob)
+router.get('/findJob/:latitude/:longitude',auth,authorizeRoles('shoveller'), findJob)
 router.post('/createJob/:houseOwnerId', createJob)
 router.get('/getJob/:jobId', getJob)
 router.patch('/updateJob/:jobId', updateJob);

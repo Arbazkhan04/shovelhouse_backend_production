@@ -7,15 +7,28 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const getAllJobs = async (req, res) => {
   try {
-    // Find all jobs with status 'open' and not 'in-progress', and populate house owner's name
+    const { page = 1, limit = 10 } = req.query; // Get page and limit from query params
+    const skip = (page - 1) * limit;
+
+    // Find all jobs with pagination, status 'open' and not 'in-progress', and populate house owner's name
     const jobs = await Job.find({})
       .populate({
         path: 'houseOwnerId',
         select: 'name imageUrl', // Choose fields to return from the User schema
       })
-      .sort('createdAt');
+      .sort('createdAt')
+      .skip(skip) // Skip jobs based on the page number
+      .limit(parseInt(limit)); // Limit number of jobs
 
-    res.status(StatusCodes.OK).json({ jobs, count: jobs.length });
+    // Get the total number of jobs for calculating the total pages
+    const totalJobs = await Job.countDocuments();
+
+    res.status(StatusCodes.OK).json({
+      jobs,
+      count: jobs.length,
+      totalPages: Math.ceil(totalJobs / limit), // Total number of pages
+      currentPage: page
+    });
   } catch (error) {
     throw new BadRequestError('Invalid job data');
   }
@@ -359,93 +372,90 @@ const markJobAsCompleted = async (req, res) => {
       const amountForShoveller = totalAmount - platformFee; // Amount to be sent to the shoveller
 
 
-      try {
-        // Transfer the payout to the shoveller in CAD
-        const payout = await stripe.transfers.create({
-          amount: Math.round(amountForShoveller), // amount in cents
-          currency: 'cad', // Set the currency to CAD for the shoveller
-          destination: shoveller.stripeAccountId, // Use the shoveller's Stripe account ID
-        });
+    try {
+      // Transfer the payout to the shoveller in CAD
+      const payout = await stripe.transfers.create({
+        amount: Math.round(amountForShoveller), // amount in cents
+        currency: 'cad', // Set the currency to CAD for the shoveller
+        destination: shoveller.stripeAccountId, // Use the shoveller's Stripe account ID
+      });
+      // If the transfer is successful, update the job status
+      await Job.findOneAndUpdate(
+        {
+          _id: jobId,
+          'ShovelerInfo.ShovelerId': shovellerId  // Match based on the Shoveller's ID
+        },
+        {
+          $set: {
+            'ShovelerInfo.$.PayoutStatus': 'paid'  // Update the payout status for the matched shoveller
+          }
+        },
+        { new: true }
+      );
+      console.log('Payout successful:', payout);
 
-        // If the transfer is successful, update the job status
-        await Job.findOneAndUpdate(
-          {
-            _id: jobId,
-            'ShovelerInfo.ShovelerId': shovellerId  // Match based on the Shoveller's ID
-          },
-          {
-            $set: {
-              'ShovelerInfo.$.PayoutStatus': 'paid'  // Update the payout status for the matched shoveller
-            }
-          },
-          { new: true }
-        );
-        // console.log('Payout successful:', payout);
+      // Increment the job count for the shoveller
+      await User.findByIdAndUpdate(
+        shovellerId,
+        { $inc: { jobCount: 1 } }, // Increment jobCount by 1
+        { new: true }
+      );
 
-        // Increment the job count for the shoveller
-        await User.findByIdAndUpdate(
-          shovellerId,
-          { $inc: { jobCount: 1 } }, // Increment jobCount by 1
-          { new: true }
-        );
-
-        // Send an email to the shoveller
-        // Define updated HTML content for the email
-        const htmlContent = `
+      // Send an email to the shoveller
+      // Define updated HTML content for the email
+      const htmlContent = `
 <html>
-  <head>
-    <style>
-      body { font-family: Arial, sans-serif; font-size: 16px; color: #333; }
-      .header { background-color: #f8f8f8; padding: 20px 5px; text-align: center; }
-      .content { padding: 20px 5px; }
-      .footer { background-color: #f8f8f8; padding: 20px 5px; text-align: center; font-size: 14px; }
-      .btn-reset { background-color: #4bcc5a; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
-      .payment-header { font-weight: 700; font-size: 30px; color: #4bcc5a; }
-      .payment-amount { font-weight: bold; font-size: 20px; }
-      .highlight { color: #4bcc5a; font-weight: bold; }
-    </style>
-  </head>
-  <body>
-    <div class="header">
-      <p class="payment-header">Congratulations! Your Payment is Complete</p>
-    </div>
-    <div class="content">
-      <p>Hello,</p>
-      <p>We're excited to inform you that your payment for the completed job has been successfully transferred to your account. You have received a total of <span class="payment-amount">$${amountForShoveller / 100} CAD</span>.</p>
-      <p>Thank you for providing excellent service! You can review the payment details in your Shovel-House account.</p>
-      <p>If you have any questions, feel free to <a href="mailto:support@shovelhouse.com" class="highlight">contact our support team</a>.</p>
-    </div>
-    <div class="footer">
-      <p>Thank you for being part of Shovel-House!</p>
-      <p><strong>Shovel-House Team</strong></p>
-    </div>
-  </body>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 16px; color: #333; }
+    .header { background-color: #f8f8f8; padding: 20px 5px; text-align: center; }
+    .content { padding: 20px 5px; }
+    .footer { background-color: #f8f8f8; padding: 20px 5px; text-align: center; font-size: 14px; }
+    .btn-reset { background-color: #4bcc5a; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
+    .payment-header { font-weight: 700; font-size: 30px; color: #4bcc5a; }
+    .payment-amount { font-weight: bold; font-size: 20px; }
+    .highlight { color: #4bcc5a; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <p class="payment-header">Congratulations! Your Payment is Complete</p>
+  </div>
+  <div class="content">
+    <p>Hello,</p>
+    <p>We're excited to inform you that your payment for the completed job has been successfully transferred to your account. You have received a total of <span class="payment-amount">$${amountForShoveller / 100} CAD</span>.</p>
+    <p>Thank you for providing excellent service! You can review the payment details in your Shovel-House account.</p>
+    <p>If you have any questions, feel free to <a href="mailto:support@shovelhouse.com" class="highlight">contact our support team</a>.</p>
+  </div>
+  <div class="footer">
+    <p>Thank you for being part of Shovel-House!</p>
+    <p><strong>Shovel-House Team</strong></p>
+  </div>
+</body>
 </html>
 `;
 
-        await sendEmail({
-          to: shoveller.email,
-          subject: "Payment information for completed job",
-          html: htmlContent, // Send HTML content here
-        });
-      } catch (error) {
-        await Job.findOneAndUpdate(
-          {
-            _id: jobId,
-            'ShovelerInfo.ShovelerId': shovellerId  // Match based on the Shoveller's ID
-          },
-          {
-            $set: {
-              'ShovelerInfo.$.PayoutStatus': 'failed'  // Update the payout status for the matched shoveller
-            }
-          },
-          { new: true }
-        );
+      await sendEmail({
+        to: shoveller.email,
+        subject: "Payment information for completed job",
+        html: htmlContent, // Send HTML content here
+      });
+    } catch (error) {
+      await Job.findOneAndUpdate(
+        {
+          _id: jobId,
+          'ShovelerInfo.ShovelerId': shovellerId  // Match based on the Shoveller's ID
+        },
+        {
+          $set: {
+            'ShovelerInfo.$.PayoutStatus': 'failed'  // Update the payout status for the matched shoveller
+          }
+        },
+        { new: true }
+      );
 
-        return res.status(200).json({ error: "Error transferring the payout" });
-
-        // console.error('Error transferring to shoveller:', error.message);
-      }
+      console.error('Error transferring to shoveller:', error.message);
+    }
 
     }
     else if (role === 'shoveller') {
@@ -789,12 +799,12 @@ const getJob = async (req, res) => {
 
 const findJob = async (req, res) => {
   const {
-    query: { latitude, longitude },  // Get the latitude and longitude from the query params
+    params: { latitude, longitude },  // Use req.params instead of req.query
   } = req;
 
   // Check if latitude and longitude are provided and valid
   if (!latitude || !longitude) {
-    return res.status(200).json({ message: 'Please provide latitude and longitude in the query params' });
+    return res.status(200).json({ error: 'Please provide latitude and longitude in the  params' });
   }
 
   // Parse latitude and longitude to float and check validity
@@ -802,7 +812,7 @@ const findJob = async (req, res) => {
   const lon = parseFloat(longitude);
 
   if (isNaN(lat) || isNaN(lon)) {
-    return res.status(200).json({ message: 'Invalid latitude or longitude value' });
+    return res.status(200).json({ error: 'Invalid latitude or longitude value' });
   }
 
   try {
@@ -815,22 +825,22 @@ const findJob = async (req, res) => {
             coordinates: [lon, lat], // Longitude first, then latitude
           },
           distanceField: 'distance',
-          //maxDistance: 10000, // it will get jobs under 10km radius
+          maxDistance: 10000, // it will get jobs under 10km radius
           spherical: true,
         },
       },
-      { $limit: 20 },
+      { $limit: 10 },
     ]);
 
     if (!jobs || jobs.length === 0) {
-      return res.status(200).json({ message: 'No jobs found near the given location' });
+      return res.status(200).json({ error: 'No jobs found near the given location' });
     }
 
     // Return the jobs sorted by proximity
-    res.status(200).json({ jobs });
+    res.status(200).json({ jobs:jobs,count:jobs.length });
   } catch (error) {
     console.error('Error finding jobs:', error); // Add logging for debugging
-    res.status(200).json({ message: 'Server error', error: error.message });
+    res.status(200).json({ error: 'Server error', error: error.message });
   }
 };
 
@@ -847,7 +857,7 @@ const updateJob = async (req, res) => {
 
   } catch (error) {
     console.log('Error updating job:', error); // Add logging for debugging
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Server error', error: error.message });
+    res.status(200).json({ error: 'Server error', error: error.message });
   }
 }
 
