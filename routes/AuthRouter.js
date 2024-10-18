@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const { register, login, getAllUsers, getUserName,resetPassword, forgotPassword, searchUsers, updateUser, get_Shovelers_With_Probation_Completed
     , changeUserStatus, mark_Shoveler_Probation, get_Shoveler_referral_code, sendRefererPayment,
-    getAllShovelersInfo
+    getAllShovelersInfo, getUser
 } = require('../controller/auth')
 const { auth, authorizeRoles } = require('../middleware/authentication')
 
@@ -26,5 +26,7 @@ router.post('/login', login)
 
 router.post('/forgotPassword', forgotPassword)
 router.patch('/resetPassword/:resetToken', resetPassword)
+
+router.get('/getUser/:id', getUser)
 
 module.exports = router
