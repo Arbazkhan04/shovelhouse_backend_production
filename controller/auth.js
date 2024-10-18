@@ -111,6 +111,7 @@ const register = async (req, res) => {
             role: user.userRole,
             chargesEnabled: user.chargesEnabled,
             stripeAccountId: user.stripeAccountId,
+            referralCode: user.referralCode,
           },
           token,
         });
@@ -220,6 +221,7 @@ const login = async (req, res, next) => {
           stripeAccountId: user.stripeAccountId,
           latitude: user.latitude,
           longitude: user.longitude,
+          referralCode: user.referralCode,
         },
         token,
       });
