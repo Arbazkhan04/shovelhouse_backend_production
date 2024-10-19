@@ -29,8 +29,11 @@ const Checkout = async (req, res) => {
             payment_intent_data: {
                 capture_method: 'manual', // Authorize only, capture later
             },
-            success_url: `http://localhost:3000/houseowner/stripeCheckout?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: 'http://localhost:3000/houseowner/stripeCheckout?canceled=true',
+            // success_url: `http://localhost:3000/houseowner/stripeCheckout?session_id={CHECKOUT_SESSION_ID}`,
+            // cancel_url: 'http://localhost:3000/houseowner/stripeCheckout?canceled=true',
+
+            success_url: `https://shovel-house.vercel.app/houseowner/stripeCheckout?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: 'https://shovel-house.vercel.app//houseowner/stripeCheckout?canceled=true',
         });
 
         // Update the existing job with the new payment information
